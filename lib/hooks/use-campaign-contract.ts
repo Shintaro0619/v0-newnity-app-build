@@ -7,6 +7,7 @@ import { CAMPAIGN_ESCROW_ABI } from "@/lib/contracts/campaign-escrow-abi"
 import { USDC_ABI } from "@/lib/contracts/usdc-abi"
 import { getContractAddress } from "@/lib/contracts/contract-addresses"
 import { baseSepolia } from "wagmi/chains"
+import { savePledgeToDatabase } from "@/lib/actions/campaigns"
 
 export function useCampaignContract(campaignId?: number) {
   const { address, chainId = baseSepolia.id } = useAccount()
@@ -79,9 +80,58 @@ export function useCampaignContract(campaignId?: number) {
 
   const { isLoading: isPledgeLoading, isSuccess: isPledgeSuccess } = useWaitForTransactionReceipt({
     hash: pledgeHash,
-    onSuccess: () => {
+    onSuccess: async (receipt) => {
       toast.success("Pledge successful!")
       refetchCampaign()
+
+      // Save pledge to database
+      if (campaignId && address && pledgeHash) {
+        try {
+          // Extract pledge amount from transaction logs
+          const pledgeLog = receipt.logs.find((log) => {
+            try {
+              const decoded = decodeEventLog({
+                abi: CAMPAIGN_ESCROW_ABI,
+                data: log.data,
+                topics: log.topics,
+              })
+              return decoded.eventName === "PledgeMade"
+            } catch {
+              return false
+            }
+          })
+
+          if (pledgeLog) {
+            const decoded = decodeEventLog({
+              abi: CAMPAIGN_ESCROW_ABI,
+              data: pledgeLog.data,
+              topics: pledgeLog.topics,
+            })
+
+            // Get campaign ID from database using blockchain campaign ID
+            const response = await fetch(`/api/campaigns?blockchainId=${campaignId}`)
+            const campaigns = await response.json()
+
+            if (campaigns && campaigns.length > 0) {
+              const campaign = campaigns[0]
+              const amountInUsdc = Number(decoded.args.amount) / 1e6 // Convert from wei to USDC
+
+              await savePledgeToDatabase({
+                campaignId: campaign.id,
+                backerWalletAddress: address,
+                amount: amountInUsdc,
+                txHash: pledgeHash,
+                blockNumber: Number(receipt.blockNumber),
+              })
+
+              console.log("[v0] Pledge saved to database successfully")
+            }
+          }
+        } catch (error) {
+          console.error("[v0] Failed to save pledge to database:", error)
+          // Don't throw - pledge was successful on blockchain
+        }
+      }
     },
   })
 
@@ -133,7 +183,12 @@ export function useCampaignContract(campaignId?: number) {
   }
 
   const handlePledge = (campaignId: number, amount: string) => {
+    console.log("[v0] handlePledge called:", { campaignId, amount })
     const amountInWei = parseUnits(amount, 6)
+    console.log("[v0] Calling pledge contract function with:", {
+      campaignId: BigInt(campaignId).toString(),
+      amountInWei: amountInWei.toString(),
+    })
     pledge({
       address: escrowAddress,
       abi: CAMPAIGN_ESCROW_ABI,

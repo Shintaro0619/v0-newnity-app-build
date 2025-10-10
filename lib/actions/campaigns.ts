@@ -113,7 +113,10 @@ export async function getCampaigns(filters?: {
       ${sql.unsafe(offsetClause)}
     `
 
-    return campaigns
+    return campaigns.map((campaign) => ({
+      ...campaign,
+      blockchainCampaignId: campaign.blockchain_campaign_id,
+    }))
   } catch (error) {
     console.error("[v0] Error fetching campaigns:", error)
     return []
@@ -143,6 +146,7 @@ export async function getCampaignById(id: string) {
     const campaign = result[0]
     return {
       ...campaign,
+      blockchainCampaignId: campaign.blockchain_campaign_id,
       creator: {
         name: campaign.creator_name,
         avatar: campaign.creator_avatar,
@@ -293,7 +297,6 @@ export async function updateCampaignBlockchainData(
 
 export async function getCampaignsByCreator(creatorWalletAddress: string) {
   try {
-    // First get the user ID from wallet address
     const userResult = await sql`
       SELECT id FROM users WHERE wallet_address = ${creatorWalletAddress}
     `
@@ -318,9 +321,143 @@ export async function getCampaignsByCreator(creatorWalletAddress: string) {
       ORDER BY c.created_at DESC
     `
 
-    return campaigns
+    return campaigns.map((campaign) => ({
+      ...campaign,
+      blockchainCampaignId: campaign.blockchain_campaign_id,
+    }))
   } catch (error) {
     console.error("[v0] Error fetching creator campaigns:", error)
     return []
+  }
+}
+
+export async function getCampaignsByBacker(backerWalletAddress: string) {
+  try {
+    const userResult = await sql`
+      SELECT id FROM users WHERE wallet_address = ${backerWalletAddress}
+    `
+
+    if (userResult.length === 0) {
+      return []
+    }
+
+    const userId = userResult[0].id
+
+    const campaigns = await sql`
+      SELECT 
+        c.*,
+        u.name as creator_name,
+        u.avatar as creator_avatar,
+        COUNT(DISTINCT p2.id) as backers_count,
+        SUM(CASE WHEN p.backer_id = ${userId} THEN p.amount ELSE 0 END) as my_pledge_amount,
+        MAX(p.created_at) as last_pledge_date
+      FROM campaigns c
+      LEFT JOIN users u ON c.creator_id = u.id
+      LEFT JOIN pledges p ON c.id = p.campaign_id AND p.backer_id = ${userId} AND p.status = 'CONFIRMED'
+      LEFT JOIN pledges p2 ON c.id = p2.campaign_id AND p2.status = 'CONFIRMED'
+      WHERE p.id IS NOT NULL
+      GROUP BY c.id, u.name, u.avatar 
+      ORDER BY last_pledge_date DESC
+    `
+
+    return campaigns.map((campaign) => ({
+      ...campaign,
+      blockchainCampaignId: campaign.blockchain_campaign_id,
+      myPledgeAmount: campaign.my_pledge_amount,
+    }))
+  } catch (error) {
+    console.error("[v0] Error fetching backed campaigns:", error)
+    return []
+  }
+}
+
+export async function getUserPledgeStats(walletAddress: string) {
+  try {
+    const userResult = await sql`
+      SELECT id FROM users WHERE wallet_address = ${walletAddress}
+    `
+
+    if (userResult.length === 0) {
+      return { totalPledged: 0, totalBacked: 0 }
+    }
+
+    const userId = userResult[0].id
+
+    const stats = await sql`
+      SELECT 
+        COALESCE(SUM(amount), 0) as total_pledged,
+        COUNT(DISTINCT campaign_id) as total_backed
+      FROM pledges
+      WHERE backer_id = ${userId} AND status = 'CONFIRMED'
+    `
+
+    return {
+      totalPledged: Number(stats[0]?.total_pledged || 0),
+      totalBacked: Number(stats[0]?.total_backed || 0),
+    }
+  } catch (error) {
+    console.error("[v0] Error fetching user pledge stats:", error)
+    return { totalPledged: 0, totalBacked: 0 }
+  }
+}
+
+export async function savePledgeToDatabase(data: {
+  campaignId: string
+  backerWalletAddress: string
+  amount: number
+  txHash: string
+  blockNumber?: number
+}) {
+  try {
+    // Ensure user exists
+    const userId = await ensureUserExists(data.backerWalletAddress)
+
+    // Create pledge and update campaign raised amount in a transaction
+    const result = await sql.begin(async (sql) => {
+      // Insert pledge
+      const pledge = await sql`
+        INSERT INTO pledges (
+          id,
+          campaign_id,
+          backer_id,
+          amount,
+          currency,
+          status,
+          tx_hash,
+          block_number,
+          created_at,
+          updated_at
+        ) VALUES (
+          gen_random_uuid(),
+          ${data.campaignId},
+          ${userId},
+          ${data.amount},
+          'USDC',
+          'CONFIRMED',
+          ${data.txHash},
+          ${data.blockNumber || null},
+          NOW(),
+          NOW()
+        )
+        RETURNING *
+      `
+
+      // Update campaign raised amount
+      await sql`
+        UPDATE campaigns
+        SET 
+          raised_amount = raised_amount + ${data.amount},
+          updated_at = NOW()
+        WHERE id = ${data.campaignId}
+      `
+
+      return pledge[0]
+    })
+
+    console.log("[v0] Pledge saved to database:", result)
+    return result
+  } catch (error) {
+    console.error("[v0] Error saving pledge to database:", error)
+    throw error
   }
 }

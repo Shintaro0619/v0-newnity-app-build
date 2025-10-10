@@ -9,7 +9,7 @@ import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DollarSign, Users, Heart, Target, Award, Plus, Clock } from "lucide-react"
 import Link from "next/link"
-import { getCampaignsByCreator } from "@/lib/actions/campaigns"
+import { getCampaignsByCreator, getCampaignsByBacker, getUserPledgeStats } from "@/lib/actions/campaigns"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface Pledge {
@@ -35,6 +35,7 @@ interface Campaign {
   status: string
   created_at: string
   blockchain_campaign_id: number | null
+  myPledgeAmount?: number
 }
 
 interface DashboardStats {
@@ -103,6 +104,7 @@ export default function DashboardPage() {
   const { address } = useAccount()
   const [pledges, setPledges] = useState<Pledge[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
+  const [backedCampaigns, setBackedCampaigns] = useState<Campaign[]>([])
   const [stats, setStats] = useState<DashboardStats>({
     totalPledged: 0,
     totalCampaigns: 0,
@@ -120,18 +122,27 @@ export default function DashboardPage() {
   async function loadDashboardData() {
     setLoading(true)
     try {
-      const campaignData = await getCampaignsByCreator(address!)
+      const [campaignData, backedData, pledgeStats] = await Promise.all([
+        getCampaignsByCreator(address!),
+        getCampaignsByBacker(address!),
+        getUserPledgeStats(address!),
+      ])
+
       console.log("[v0] Dashboard campaigns loaded:", campaignData)
+      console.log("[v0] Backed campaigns loaded:", backedData)
+      console.log("[v0] Pledge stats loaded:", pledgeStats)
+
       setCampaigns(campaignData as any)
+      setBackedCampaigns(backedData as any)
 
       // Calculate stats
       const totalCampaigns = campaignData.length
       const activeCampaigns = campaignData.filter((c: any) => c.status === "ACTIVE").length
 
       setStats({
-        totalPledged: 0, // TODO: Calculate from pledges
+        totalPledged: pledgeStats.totalPledged,
         totalCampaigns,
-        totalBacked: 0, // TODO: Calculate from pledges
+        totalBacked: pledgeStats.totalBacked,
         successRate: totalCampaigns > 0 ? (activeCampaigns / totalCampaigns) * 100 : 0,
       })
     } catch (error) {
@@ -371,6 +382,82 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
+
+        {/* Backed Campaigns Section */}
+        {backedCampaigns.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Projects I've Backed</CardTitle>
+              <CardDescription>Campaigns you're supporting</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                {backedCampaigns.map((campaign: any) => {
+                  const daysLeft = getDaysLeft(campaign.end_date)
+                  const progressPercentage = (Number(campaign.raised_amount) / Number(campaign.goal_amount)) * 100
+
+                  return (
+                    <div key={campaign.id} className="border rounded-lg p-6">
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex space-x-4">
+                          <img
+                            src={campaign.cover_image || "/placeholder.svg?height=80&width=80"}
+                            alt={campaign.title}
+                            className="h-20 w-20 rounded-lg object-cover"
+                          />
+                          <div>
+                            <h3 className="text-xl font-semibold">{campaign.title}</h3>
+                            <p className="text-muted-foreground line-clamp-2">{campaign.description}</p>
+                            <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
+                              <span className="flex items-center">
+                                <Users className="h-4 w-4 mr-1" />
+                                {campaign.backers_count} backers
+                              </span>
+                              <span className="flex items-center">
+                                <Clock className="h-4 w-4 mr-1" />
+                                {daysLeft} days left
+                              </span>
+                              <span className="flex items-center font-medium text-primary">
+                                <Heart className="h-4 w-4 mr-1 fill-primary" />
+                                You pledged ${Number(campaign.myPledgeAmount || 0).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <Badge
+                          variant={
+                            campaign.status === "ACTIVE"
+                              ? "default"
+                              : campaign.status === "DRAFT"
+                                ? "secondary"
+                                : "outline"
+                          }
+                        >
+                          {campaign.status}
+                        </Badge>
+                      </div>
+
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>${Number(campaign.raised_amount).toLocaleString()} raised</span>
+                          <span>${Number(campaign.goal_amount).toLocaleString()} goal</span>
+                        </div>
+                        <Progress value={progressPercentage} className="h-2" />
+                        <p className="text-xs text-muted-foreground">{Math.round(progressPercentage)}% funded</p>
+                      </div>
+
+                      <div className="flex justify-end space-x-2 mt-4">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/campaigns/${campaign.id}`}>View Campaign</Link>
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   )

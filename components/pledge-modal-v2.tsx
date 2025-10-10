@@ -1,11 +1,9 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { formatUnits } from "viem"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,16 +12,20 @@ import { Loader2, DollarSign } from "lucide-react"
 import { useCampaignContract } from "@/lib/hooks/use-campaign-contract"
 
 interface PledgeModalV2Props {
-  campaignId: number
-  children: React.ReactNode
+  campaignId: bigint
+  campaignTitle: string
+  onClose: () => void
+  onSuccess?: () => void
 }
 
-export function PledgeModalV2({ campaignId, children }: PledgeModalV2Props) {
-  const [isOpen, setIsOpen] = useState(false)
+export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }: PledgeModalV2Props) {
   const [amount, setAmount] = useState("")
   const [step, setStep] = useState<"input" | "approve" | "pledge">("input")
 
   const { isConnected } = useAccount()
+
+  const campaignIdNumber = Number(campaignId)
+
   const {
     usdcBalance,
     usdcAllowance,
@@ -35,11 +37,23 @@ export function PledgeModalV2({ campaignId, children }: PledgeModalV2Props) {
     isPledgePending,
     isPledgeLoading,
     isPledgeSuccess,
-  } = useCampaignContract(campaignId)
+  } = useCampaignContract(campaignIdNumber)
+
+  console.log("[v0] Pledge modal opened for campaign:", campaignIdNumber)
 
   const amountInWei = amount ? BigInt(Number.parseFloat(amount) * 1e6) : 0n
   const hasEnoughBalance = usdcBalance ? usdcBalance >= amountInWei : false
   const hasEnoughAllowance = usdcAllowance ? usdcAllowance >= amountInWei : false
+
+  useEffect(() => {
+    console.log("[v0] Pledge states:", {
+      step,
+      isPledgePending,
+      isPledgeLoading,
+      isPledgeSuccess,
+      amount,
+    })
+  }, [step, isPledgePending, isPledgeLoading, isPledgeSuccess, amount])
 
   const resetForm = () => {
     setAmount("")
@@ -47,22 +61,38 @@ export function PledgeModalV2({ campaignId, children }: PledgeModalV2Props) {
   }
 
   // Auto-advance after approval
-  if (isApproveSuccess && step === "approve") {
-    setStep("pledge")
-  }
+  useEffect(() => {
+    if (isApproveSuccess && step === "approve") {
+      console.log("[v0] Approval successful, advancing to pledge step")
+      setStep("pledge")
+    }
+  }, [isApproveSuccess, step])
 
-  // Close modal after successful pledge
-  if (isPledgeSuccess && isOpen) {
-    setTimeout(() => {
-      setIsOpen(false)
-      resetForm()
-    }, 2000)
+  useEffect(() => {
+    if (isPledgeSuccess) {
+      console.log("[v0] Pledge successful, closing modal in 2 seconds")
+      setTimeout(() => {
+        if (onSuccess) {
+          onSuccess()
+        }
+        onClose()
+        resetForm()
+      }, 2000)
+    }
+  }, [isPledgeSuccess, onClose, onSuccess])
+
+  const handleConfirmPledge = () => {
+    console.log("[v0] Confirm Pledge clicked:", {
+      campaignIdNumber,
+      amount,
+      step,
+    })
+    handlePledge(campaignIdNumber, amount)
   }
 
   if (!isConnected) {
     return (
-      <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogTrigger asChild>{children}</DialogTrigger>
+      <Dialog open={true} onOpenChange={onClose}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Connect Wallet Required</DialogTitle>
@@ -74,11 +104,10 @@ export function PledgeModalV2({ campaignId, children }: PledgeModalV2Props) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+    <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Make a Pledge</DialogTitle>
+          <DialogTitle>Back {campaignTitle}</DialogTitle>
         </DialogHeader>
 
         {step === "input" && (
@@ -152,7 +181,7 @@ export function PledgeModalV2({ campaignId, children }: PledgeModalV2Props) {
             </Card>
 
             <Button
-              onClick={() => handlePledge(campaignId, amount)}
+              onClick={handleConfirmPledge}
               disabled={isPledgePending || isPledgeLoading}
               className="w-full bg-[#1DB954] hover:bg-[#1DB954]/90 text-white"
             >

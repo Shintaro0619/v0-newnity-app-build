@@ -11,6 +11,7 @@ import { useAccount } from "wagmi"
 import { PledgeModalV2 } from "@/components/pledge-modal-v2"
 import { DeployCampaignButton } from "@/components/campaigns/deploy-campaign-button"
 import { formatUnits } from "viem"
+import { getCampaignById } from "@/lib/actions/campaigns"
 
 interface CampaignDetailClientProps {
   campaign: any
@@ -27,6 +28,19 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   const blockchainId = campaign.blockchainCampaignId
   const contractHook = useCampaignContract(blockchainId ?? undefined)
   const { campaignData, handleFinalize, handleRefund, isFinalizePending, isRefundPending } = contractHook
+
+  const refreshCampaignData = async () => {
+    try {
+      console.log("[v0] Refreshing campaign data from database")
+      const updatedCampaign = await getCampaignById(campaign.id)
+      if (updatedCampaign) {
+        setCampaign(updatedCampaign)
+        console.log("[v0] Campaign data refreshed:", updatedCampaign)
+      }
+    } catch (error) {
+      console.error("[v0] Failed to refresh campaign data:", error)
+    }
+  }
 
   useEffect(() => {
     if (!blockchainId || !campaignData) {
@@ -75,6 +89,16 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     } catch (error) {
       console.error("[v0] Failed to refund:", error)
     }
+  }
+
+  const handlePledgeClick = () => {
+    console.log("[v0] Back This Project button clicked, opening modal")
+    setShowPledgeModal(true)
+  }
+
+  const handlePledgeSuccess = () => {
+    console.log("[v0] Pledge successful, refreshing campaign data")
+    refreshCampaignData()
   }
 
   const progressPercentage = (campaign.raised_amount / campaign.goal_amount) * 100
@@ -199,7 +223,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                 {blockchainId ? (
                   <Button
                     className="w-full bg-primary hover:bg-primary/90 text-white glow-primary"
-                    onClick={() => setShowPledgeModal(true)}
+                    onClick={handlePledgeClick}
                     disabled={campaign.status !== "ACTIVE"}
                   >
                     <span className="mr-2">❤️</span>
@@ -255,6 +279,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
           campaignId={BigInt(blockchainId)}
           campaignTitle={campaign.title}
           onClose={() => setShowPledgeModal(false)}
+          onSuccess={handlePledgeSuccess}
         />
       )}
     </div>
