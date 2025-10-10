@@ -403,61 +403,54 @@ export async function getUserPledgeStats(walletAddress: string) {
 
 export async function savePledgeToDatabase(data: {
   campaignId: string
-  backerWalletAddress: string
-  amount: number
+  backerId: string
+  amount: string
   txHash: string
-  blockNumber?: number
+  blockNumber: bigint
 }) {
   try {
-    // Ensure user exists
-    const userId = await ensureUserExists(data.backerWalletAddress)
+    console.log("[v0] Saving pledge to database:", data)
 
-    // Create pledge and update campaign raised amount in a transaction
-    const result = await sql.begin(async (sql) => {
-      // Insert pledge
-      const pledge = await sql`
-        INSERT INTO pledges (
-          id,
-          campaign_id,
-          backer_id,
-          amount,
-          currency,
-          status,
-          tx_hash,
-          block_number,
-          created_at,
-          updated_at
-        ) VALUES (
-          gen_random_uuid(),
-          ${data.campaignId},
-          ${userId},
-          ${data.amount},
-          'USDC',
-          'CONFIRMED',
-          ${data.txHash},
-          ${data.blockNumber || null},
-          NOW(),
-          NOW()
-        )
-        RETURNING *
-      `
+    // Create pledge record
+    await sql`
+      INSERT INTO pledges (
+        id,
+        campaign_id,
+        backer_id,
+        amount,
+        currency,
+        status,
+        tx_hash,
+        block_number,
+        created_at,
+        updated_at
+      ) VALUES (
+        gen_random_uuid(),
+        ${data.campaignId},
+        ${data.backerId},
+        ${data.amount},
+        'USDC',
+        'CONFIRMED',
+        ${data.txHash},
+        ${data.blockNumber.toString()},
+        NOW(),
+        NOW()
+      )
+    `
 
-      // Update campaign raised amount
-      await sql`
-        UPDATE campaigns
-        SET 
-          raised_amount = raised_amount + ${data.amount},
-          updated_at = NOW()
-        WHERE id = ${data.campaignId}
-      `
+    // Update campaign raised_amount
+    await sql`
+      UPDATE campaigns
+      SET 
+        raised_amount = raised_amount + ${data.amount},
+        updated_at = NOW()
+      WHERE id = ${data.campaignId}
+    `
 
-      return pledge[0]
-    })
-
-    console.log("[v0] Pledge saved to database:", result)
-    return result
+    console.log("[v0] Pledge saved to database successfully")
+    return { success: true }
   } catch (error) {
     console.error("[v0] Error saving pledge to database:", error)
-    throw error
+    return { success: false, error: String(error) }
   }
 }
