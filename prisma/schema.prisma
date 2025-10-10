@@ -1,0 +1,284 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// User management
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  avatar    String?
+  bio       String?
+  website   String?
+  
+  // Wallet & KYC
+  walletAddress String? @unique
+  kycStatus     KycStatus @default(PENDING)
+  kycProvider   String?
+  kycReference  String?
+  country       String?
+  
+  // Reputation & XP
+  xpTotal       Int @default(0)
+  reputation    Int @default(0)
+  
+  // Timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  campaigns     Campaign[]
+  pledges       Pledge[]
+  creditLedger  CreditLedger[]
+  reviewFlags   ReviewFlag[]
+  
+  @@map("users")
+}
+
+// Campaign management
+model Campaign {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  story       String?
+  
+  // Financial
+  goalAmount     Decimal  @db.Decimal(18, 6)
+  raisedAmount   Decimal  @default(0) @db.Decimal(18, 6)
+  currency       String   @default("USDC")
+  platformFee    Decimal  @default(0.04) @db.Decimal(5, 4) // 4%
+  
+  // Campaign settings
+  duration       Int      // days
+  category       String
+  tags           String[]
+  
+  // Status & dates
+  status         CampaignStatus @default(DRAFT)
+  startDate      DateTime?
+  endDate        DateTime?
+  
+  // Media
+  coverImage     String?
+  gallery        String[]
+  videoUrl       String?
+  
+  // Blockchain
+  blockchainCampaignId Int?     // On-chain campaign ID (0, 1, 2, etc.)
+  escrowAddress  String?
+  contractTxHash String?
+  
+  // Creator info
+  creatorId      String
+  creator        User     @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  // Relations
+  tiers          Tier[]
+  pledges        Pledge[]
+  milestones     Milestone[]
+  reviewFlags    ReviewFlag[]
+  
+  @@map("campaigns")
+}
+
+// Reward tiers
+model Tier {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  amount      Decimal  @db.Decimal(18, 6)
+  
+  // Tier settings
+  maxBackers  Int?
+  isLimited   Boolean  @default(false)
+  
+  // Rewards
+  rewards     String[] // JSON array of reward descriptions
+  
+  // Delivery
+  estimatedDelivery DateTime?
+  shippingCost      Decimal? @db.Decimal(18, 6)
+  
+  // Campaign relation
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  pledges     Pledge[]
+  
+  @@map("tiers")
+}
+
+// Milestones for campaign progress
+model Milestone {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  targetDate  DateTime?
+  
+  // Progress
+  status      MilestoneStatus @default(PENDING)
+  evidence    String? // IPFS hash or URL
+  
+  // Voting
+  votesFor    Int @default(0)
+  votesAgainst Int @default(0)
+  votingEnds  DateTime?
+  
+  // Campaign relation
+  campaignId  String
+  campaign    Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("milestones")
+}
+
+// Pledge/backing records
+model Pledge {
+  id         String   @id @default(cuid())
+  amount     Decimal  @db.Decimal(18, 6)
+  currency   String   @default("USDC")
+  
+  // Blockchain
+  txHash     String?  @unique
+  blockNumber BigInt?
+  
+  // Status
+  status     PledgeStatus @default(PENDING)
+  
+  // Relations
+  backerId   String
+  backer     User     @relation(fields: [backerId], references: [id], onDelete: Cascade)
+  
+  campaignId String
+  campaign   Campaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  tierId     String?
+  tier       Tier?    @relation(fields: [tierId], references: [id], onDelete: SetNull)
+  
+  // Timestamps
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  @@map("pledges")
+}
+
+// Credit ledger for FanFi points
+model CreditLedger {
+  id          String   @id @default(cuid())
+  amount      Decimal  @db.Decimal(18, 6)
+  type        CreditType
+  description String
+  
+  // Source tracking
+  sourceType  String? // "pledge", "yield", "referral", "bonus"
+  sourceId    String? // Related pledge/campaign ID
+  
+  // User relation
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  
+  @@map("credit_ledger")
+}
+
+// Review and flagging system
+model ReviewFlag {
+  id          String   @id @default(cuid())
+  type        FlagType
+  reason      String
+  description String?
+  
+  // Status
+  status      FlagStatus @default(PENDING)
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  resolution  String?
+  
+  // Relations
+  reporterId  String
+  reporter    User     @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  
+  // Timestamps
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("review_flags")
+}
+
+// Enums
+enum KycStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum CampaignStatus {
+  DRAFT
+  REVIEW
+  ACTIVE
+  SUCCESSFUL
+  FAILED
+  CANCELLED
+}
+
+enum MilestoneStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum PledgeStatus {
+  PENDING
+  CONFIRMED
+  REFUNDED
+  FAILED
+}
+
+enum CreditType {
+  EARNED
+  SPENT
+  BONUS
+  PENALTY
+}
+
+enum FlagType {
+  SPAM
+  INAPPROPRIATE
+  FRAUD
+  COPYRIGHT
+  OTHER
+}
+
+enum FlagStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+  DISMISSED
+}

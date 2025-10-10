@@ -1,0 +1,277 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Updated to newnity neon green brand colors from pitch deck */
+  --color-newnity-green: #adff2f; /* Neon green from logo */
+  --color-newnity-dark: #000000; /* Pure black background */
+  --color-newnity-card: #0a0a0a; /* Slightly lighter black for cards */
+  --color-newnity-text: #ffffff; /* Pure white text */
+
+  /* Light theme colors */
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  /* Primary color set to newnity neon green */
+  --primary: oklch(0.92 0.25 127); /* Neon green */
+  --primary-foreground: oklch(0.145 0 0); /* Dark text on green */
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.92 0.25 127); /* Same as primary for consistency */
+  --accent-foreground: oklch(0.145 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.92 0.25 127);
+  --chart-1: oklch(0.92 0.25 127);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.625rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.92 0.25 127);
+  --sidebar-primary-foreground: oklch(0.145 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  /* Dark theme with newnity space/cosmic aesthetic */
+  --background: oklch(0.05 0 0); /* Near-black background */
+  --foreground: oklch(0.985 0 0); /* Pure white text */
+  --card: oklch(0.08 0 0); /* Slightly lighter for cards */
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.08 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.92 0.25 127); /* Neon green */
+  --primary-foreground: oklch(0.05 0 0); /* Dark text on green */
+  --secondary: oklch(0.15 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.15 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.92 0.25 127); /* Neon green accent */
+  --accent-foreground: oklch(0.05 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.15 0 0);
+  --input: oklch(0.15 0 0);
+  --ring: oklch(0.92 0.25 127);
+  --chart-1: oklch(0.92 0.25 127);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.08 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.92 0.25 127);
+  --sidebar-primary-foreground: oklch(0.05 0 0);
+  --sidebar-accent: oklch(0.15 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.15 0 0);
+  --sidebar-ring: oklch(0.92 0.25 127);
+}
+
+@theme inline {
+  /* Updated font variables and color mappings */
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-space-grotesk);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+/* Added custom utility classes for newnity branding */
+@layer utilities {
+  /* Updated glow effects to use newnity neon green */
+  .glow-primary {
+    box-shadow: 0 0 20px rgba(173, 255, 47, 0.4);
+  }
+
+  .glow-primary-hover:hover {
+    box-shadow: 0 0 30px rgba(173, 255, 47, 0.6);
+  }
+
+  .glow-accent {
+    box-shadow: 0 0 20px rgba(173, 255, 47, 0.3);
+  }
+
+  .glow-text {
+    text-shadow: 0 0 20px rgba(173, 255, 47, 0.5), 0 0 40px rgba(173, 255, 47, 0.3), 0 0 60px rgba(173, 255, 47, 0.2);
+  }
+
+  .backdrop-blur-nav {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  /* Added starfield background utility */
+  .starfield-bg {
+    background-image: radial-gradient(2px 2px at 20px 30px, white, transparent),
+      radial-gradient(2px 2px at 60px 70px, white, transparent),
+      radial-gradient(1px 1px at 50px 50px, white, transparent),
+      radial-gradient(1px 1px at 130px 80px, white, transparent),
+      radial-gradient(2px 2px at 90px 10px, white, transparent);
+    background-size: 200px 200px;
+    background-color: #000000;
+  }
+}
+
+/* Added RainbowKit styles inline to fix CSS loading issue */
+/* RainbowKit Modal Styles */
+[data-rk] {
+  --rk-fonts-body: var(--font-sans);
+  /* Updated RainbowKit accent color to newnity green */
+  --rk-colors-accentColor: #adff2f;
+  --rk-colors-accentColorForeground: #000000;
+  --rk-colors-actionButtonBorder: rgba(255, 255, 255, 0.04);
+  --rk-colors-actionButtonBorderMobile: rgba(255, 255, 255, 0.08);
+  --rk-colors-actionButtonSecondaryBackground: rgba(255, 255, 255, 0.08);
+  --rk-colors-closeButton: rgba(224, 232, 255, 0.6);
+  --rk-colors-closeButtonBackground: rgba(255, 255, 255, 0.08);
+  --rk-colors-connectButtonBackground: #adff2f;
+  --rk-colors-connectButtonBackgroundError: #ff494a;
+  --rk-colors-connectButtonInnerBackground: linear-gradient(0deg, rgba(173, 255, 47, 0.075), rgba(173, 255, 47, 0.15));
+  --rk-colors-connectButtonText: #000000;
+  --rk-colors-connectButtonTextError: #ffffff;
+  --rk-colors-connectionIndicator: #adff2f;
+  --rk-colors-downloadBottomCardBackground: linear-gradient(
+      126deg,
+      rgba(255, 255, 255, 0) 9.49%,
+      rgba(171, 171, 171, 0.04) 71.04%
+    ), #0a0a0a;
+  --rk-colors-downloadTopCardBackground: linear-gradient(
+      126deg,
+      rgba(171, 171, 171, 0.2) 9.49%,
+      rgba(255, 255, 255, 0) 71.04%
+    ), #0a0a0a;
+  --rk-colors-error: #ff494a;
+  --rk-colors-generalBorder: rgba(255, 255, 255, 0.08);
+  --rk-colors-generalBorderDim: rgba(255, 255, 255, 0.04);
+  --rk-colors-menuItemBackground: rgba(173, 255, 47, 0.1);
+  --rk-colors-modalBackdrop: rgba(0, 0, 0, 0.5);
+  --rk-colors-modalBackground: #0a0a0a;
+  --rk-colors-modalBorder: rgba(255, 255, 255, 0.08);
+  --rk-colors-modalText: #ffffff;
+  --rk-colors-modalTextDim: rgba(224, 232, 255, 0.3);
+  --rk-colors-modalTextSecondary: rgba(255, 255, 255, 0.6);
+  --rk-colors-profileAction: rgba(173, 255, 47, 0.1);
+  --rk-colors-profileActionHover: rgba(173, 255, 47, 0.2);
+  --rk-colors-profileForeground: rgba(224, 232, 255, 0.05);
+  --rk-colors-selectedOptionBorder: #adff2f;
+  --rk-colors-standby: #ffc000;
+  --rk-blurs-modalOverlay: blur(20px);
+  --rk-radii-actionButton: 12px;
+  --rk-radii-connectButton: 12px;
+  --rk-radii-menuButton: 12px;
+  --rk-radii-modal: 24px;
+  --rk-radii-modalMobile: 28px;
+}
+
+[data-rk] .iekbcc0 {
+  -webkit-backdrop-filter: var(--rk-blurs-modalOverlay);
+  backdrop-filter: var(--rk-blurs-modalOverlay);
+  background: var(--rk-colors-modalBackdrop);
+  bottom: 0;
+  left: 0;
+  position: fixed;
+  right: 0;
+  top: 0;
+  z-index: 2147483646;
+}
+
+[data-rk] .ju367v0 {
+  align-items: center;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  justify-content: center;
+  left: 0;
+  padding: 20px;
+  position: absolute;
+  top: 0;
+  width: 100%;
+}
+
+[data-rk] .ju367v1 {
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  overflow: auto;
+}
+
+[data-rk] .ju367v2 {
+  background: var(--rk-colors-modalBackground);
+  border: 1px solid var(--rk-colors-modalBorder);
+  border-radius: var(--rk-radii-modal);
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.1);
+  color: var(--rk-colors-modalText);
+  font-family: var(--rk-fonts-body);
+  max-width: 408px;
+  min-width: 360px;
+  position: relative;
+}
+
+[data-rk] .ju367v3 {
+  border-radius: var(--rk-radii-modalMobile);
+  max-width: none;
+  min-width: auto;
+  width: 100%;
+}
