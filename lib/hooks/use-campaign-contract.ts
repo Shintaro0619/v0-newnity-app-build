@@ -81,6 +81,7 @@ export function useCampaignContract(campaignId?: number) {
   const { isLoading: isPledgeLoading, isSuccess: isPledgeSuccess } = useWaitForTransactionReceipt({
     hash: pledgeHash,
     onSuccess: async (receipt) => {
+      console.log("[v0] Pledge transaction confirmed:", { hash: pledgeHash, blockNumber: receipt.blockNumber })
       toast.success("Pledge successful!")
       refetchCampaign()
 
@@ -189,12 +190,19 @@ export function useCampaignContract(campaignId?: number) {
       campaignId: BigInt(campaignId).toString(),
       amountInWei: amountInWei.toString(),
     })
-    pledge({
-      address: escrowAddress,
-      abi: CAMPAIGN_ESCROW_ABI,
-      functionName: "pledge",
-      args: [BigInt(campaignId), amountInWei],
-    })
+
+    try {
+      pledge({
+        address: escrowAddress,
+        abi: CAMPAIGN_ESCROW_ABI,
+        functionName: "pledge",
+        args: [BigInt(campaignId), amountInWei],
+      })
+      console.log("[v0] pledge() function called successfully")
+    } catch (error) {
+      console.error("[v0] Error calling pledge():", error)
+      toast.error("Failed to initiate pledge transaction")
+    }
   }
 
   const handleCreateCampaign = async (goal: string, durationInDays: number, platformFeePercent = 500) => {

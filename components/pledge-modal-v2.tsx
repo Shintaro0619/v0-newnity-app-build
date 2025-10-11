@@ -52,8 +52,9 @@ export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }:
       isPledgeLoading,
       isPledgeSuccess,
       amount,
+      hasEnoughAllowance,
     })
-  }, [step, isPledgePending, isPledgeLoading, isPledgeSuccess, amount])
+  }, [step, isPledgePending, isPledgeLoading, isPledgeSuccess, amount, hasEnoughAllowance])
 
   const resetForm = () => {
     setAmount("")
@@ -86,8 +87,24 @@ export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }:
       campaignIdNumber,
       amount,
       step,
+      isPledgePending,
+      isPledgeLoading,
+      hasEnoughAllowance,
     })
+
+    if (!amount || Number.parseFloat(amount) <= 0) {
+      console.error("[v0] Invalid amount:", amount)
+      return
+    }
+
+    if (!hasEnoughAllowance) {
+      console.error("[v0] Insufficient allowance")
+      return
+    }
+
+    console.log("[v0] Calling handlePledge...")
     handlePledge(campaignIdNumber, amount)
+    console.log("[v0] handlePledge called")
   }
 
   if (!isConnected) {
