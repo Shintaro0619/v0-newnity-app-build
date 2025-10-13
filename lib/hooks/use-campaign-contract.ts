@@ -274,6 +274,47 @@ export function useCampaignContract(campaignId?: number) {
           })
 
           console.log("[v0] Campaign finalized in database")
+
+          if (decoded.args.successful) {
+            const fundsReleasedLog = receipt.logs.find((log) => {
+              try {
+                const decoded = decodeEventLog({
+                  abi: CAMPAIGN_ESCROW_ABI,
+                  data: log.data,
+                  topics: log.topics,
+                })
+                return decoded.eventName === "FundsReleased"
+              } catch {
+                return false
+              }
+            })
+
+            if (fundsReleasedLog) {
+              const fundsDecoded = decodeEventLog({
+                abi: CAMPAIGN_ESCROW_ABI,
+                data: fundsReleasedLog.data,
+                topics: fundsReleasedLog.topics,
+              })
+
+              console.log("[v0] Decoded FundsReleased event:", fundsDecoded)
+
+              const creatorAmount = Number(fundsDecoded.args.amount) / 1e6
+              const platformFee = Number(fundsDecoded.args.platformFee) / 1e6
+
+              const { saveFundsReleaseToDatabase } = await import("@/lib/actions/campaigns")
+              await saveFundsReleaseToDatabase({
+                campaignId: campaign.id,
+                creatorAddress: fundsDecoded.args.creator as string,
+                totalAmount: totalAmountInUsdc,
+                platformFee,
+                creatorAmount,
+                txHash: finalizeHash,
+              })
+
+              console.log("[v0] Funds release saved to database")
+              toast.success(`Funds released! You received $${creatorAmount.toFixed(2)} USDC`)
+            }
+          }
         }
       } catch (error) {
         console.error("[v0] Failed to update database after finalization:", error)
@@ -286,11 +327,63 @@ export function useCampaignContract(campaignId?: number) {
 
   const { isLoading: isRefundLoading, isSuccess: isRefundSuccess } = useWaitForTransactionReceipt({
     hash: refundHash,
-    onSuccess: () => {
+    onSuccess: async (receipt) => {
+      console.log("[v0] Refund transaction confirmed:", { hash: refundHash, blockNumber: receipt.blockNumber })
       toast.success("Refund successful!")
       refetchCampaign()
+
+      // Save refund to database
+      if (campaignId && address && refundHash) {
+        try {
+          console.log("[v0] Saving refund to database...")
+
+          // Fetch campaign from database
+          const response = await fetch(`/api/campaigns/${campaignId}/by-blockchain-id`)
+          if (!response.ok) {
+            console.error("[v0] Failed to fetch campaign from database")
+            return
+          }
+
+          const campaign = await response.json()
+          if (!campaign || !campaign.id) {
+            console.error("[v0] Campaign not found in database")
+            return
+          }
+
+          const amountInUsdc = Number(pledgeAmount) / 1e6 // Convert from wei to USDC
+
+          const { saveRefundToDatabase } = await import("@/lib/actions/campaigns")
+          const result = await saveRefundToDatabase({
+            campaignId: campaign.id,
+            backerWalletAddress: address,
+            amount: amountInUsdc,
+            txHash: refundHash,
+          })
+
+          if (result.success) {
+            console.log("[v0] Refund saved to database successfully")
+          } else {
+            console.error("[v0] Failed to save refund to database:", result.error)
+          }
+        } catch (error) {
+          console.error("[v0] Failed to save refund to database:", error)
+        }
+      }
     },
   })
+
+  const { data: pledgeRefundStatus } = useReadContract({
+    address: escrowAddress,
+    abi: CAMPAIGN_ESCROW_ABI,
+    functionName: "getPledge",
+    args: campaignId !== undefined && address ? [BigInt(campaignId), address] : undefined,
+    query: {
+      enabled: campaignId !== undefined && !!address,
+    },
+  })
+
+  const hasClaimedRefund = pledgeRefundStatus ? (pledgeRefundStatus[1] as boolean) : false
+  const userPledgeAmount = pledgeRefundStatus ? (pledgeRefundStatus[0] as bigint) : 0n
 
   const handleApprove = (amount: string) => {
     const amountInWei = parseUnits(amount, 6) // USDC has 6 decimals
@@ -462,5 +555,9 @@ export function useCampaignContract(campaignId?: number) {
 
     // Extract campaign ID from receipt
     extractCampaignIdFromReceipt,
+
+    // Refund status
+    hasClaimedRefund,
+    userPledgeAmount,
   }
 }

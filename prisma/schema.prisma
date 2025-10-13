@@ -66,6 +66,9 @@ model Campaign {
   startDate      DateTime?
   endDate        DateTime?
   
+  deadlineInputType String? @default("date_only") // "date_only" (MVP), "datetime_utc", "datetime_tz" (future)
+  deadlineInputTz   String? // Timezone for deadline input (future use)
+  
   // Media
   coverImage     String?
   gallery        String[]
@@ -90,6 +93,8 @@ model Campaign {
   milestones     Milestone[]
   reviewFlags    ReviewFlag[]
   
+  @@index([endDate])
+  @@index([status, endDate])
   @@map("campaigns")
 }
 

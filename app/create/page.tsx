@@ -616,7 +616,10 @@ export default function CreateCampaignPage() {
                         />
                       </div>
                       {errors.duration && <p className="text-sm text-destructive">{errors.duration}</p>}
-                      <p className="text-xs text-muted-foreground">Most successful campaigns run for 30-60 days</p>
+                      <p className="text-xs text-muted-foreground">
+                        Campaign will end at 23:59:59 UTC on the final day. Most successful campaigns run for 30-60
+                        days.
+                      </p>
                     </div>
 
                     <div className="space-y-2">
@@ -669,7 +672,8 @@ export default function CreateCampaignPage() {
                   <Alert>
                     <span className="text-lg">⚠️</span>
                     <AlertDescription>
-                      Remember: This is an all-or-nothing funding model. You only receive funds if you reach your goal.
+                      Remember: This is an all-or-nothing funding model. You only receive funds if you reach your goal
+                      by the deadline.
                     </AlertDescription>
                   </Alert>
                 </div>

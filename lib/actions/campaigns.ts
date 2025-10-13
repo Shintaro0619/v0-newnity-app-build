@@ -1,6 +1,7 @@
 "use server"
 
 import { sql } from "@/lib/db"
+import { calculateDeadline } from "@/lib/utils/date-utils"
 
 export interface Campaign {
   id: string
@@ -26,6 +27,7 @@ export interface Campaign {
   created_at: Date
   updated_at: Date
   blockchain_campaign_id?: number
+  deadline_input_type?: string
 }
 
 export async function ensureUserExists(walletAddress: string) {
@@ -182,8 +184,9 @@ export async function createCampaign(data: {
   try {
     const userId = await ensureUserExists(data.creator_id)
 
-    const endDate = new Date()
-    endDate.setDate(endDate.getDate() + data.duration)
+    const startDate = new Date()
+    const deadlineTimestamp = calculateDeadline(startDate, data.duration)
+    const endDate = new Date(deadlineTimestamp * 1000)
 
     const result = await sql`
       INSERT INTO campaigns (
@@ -223,7 +226,7 @@ export async function createCampaign(data: {
         ${data.gallery},
         ${data.video_url || null},
         'DRAFT',
-        NOW(),
+        ${startDate.toISOString()},
         ${endDate.toISOString()},
         ${data.duration},
         'USDC',
@@ -235,6 +238,12 @@ export async function createCampaign(data: {
       )
       RETURNING *
     `
+
+    console.log("[v0] Campaign created with deadline:", {
+      duration: data.duration,
+      endDate: endDate.toISOString(),
+      deadlineTimestamp,
+    })
 
     return result[0]
   } catch (error) {
@@ -485,6 +494,65 @@ export async function finalizeCampaignInDatabase(data: {
     return { success: true }
   } catch (error) {
     console.error("[v0] Error finalizing campaign in database:", error)
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function saveRefundToDatabase(data: {
+  campaignId: string
+  backerWalletAddress: string
+  amount: number
+  txHash: string
+}) {
+  try {
+    console.log("[v0] Saving refund to database:", data)
+
+    const backerId = await ensureUserExists(data.backerWalletAddress)
+
+    // Update pledge status to REFUNDED
+    await sql`
+      UPDATE pledges
+      SET 
+        status = 'REFUNDED',
+        updated_at = NOW()
+      WHERE campaign_id = ${data.campaignId}
+        AND backer_id = ${backerId}
+        AND status = 'CONFIRMED'
+    `
+
+    console.log("[v0] Refund saved to database successfully")
+    return { success: true }
+  } catch (error) {
+    console.error("[v0] Error saving refund to database:", error)
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function saveFundsReleaseToDatabase(data: {
+  campaignId: string
+  creatorAddress: string
+  totalAmount: number
+  platformFee: number
+  creatorAmount: number
+  txHash: string
+}) {
+  try {
+    console.log("[v0] Saving funds release to database:", data)
+
+    // Update campaign with withdrawal information
+    await sql`
+      UPDATE campaigns
+      SET 
+        status = 'FUNDED',
+        raised_amount = ${data.totalAmount},
+        updated_at = NOW()
+      WHERE id = ${data.campaignId}
+    `
+
+    console.log("[v0] Funds release saved to database successfully")
+    return { success: true }
+  } catch (error) {
+    console.error("[v0] Error saving funds release to database:", error)
     return { success: false, error: String(error) }
   }
 }

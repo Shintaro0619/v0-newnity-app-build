@@ -12,6 +12,7 @@ import { PledgeModalV2 } from "@/components/pledge-modal-v2"
 import { DeployCampaignButton } from "@/components/campaigns/deploy-campaign-button"
 import { formatUnits } from "viem"
 import { getCampaignById, savePledgeToDatabase } from "@/lib/actions/campaigns"
+import { formatDeadline, isDeadlinePassed } from "@/lib/utils/date-utils"
 
 interface CampaignDetailClientProps {
   campaign: any
@@ -33,7 +34,15 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
 
   const blockchainId = campaign.blockchainCampaignId
   const contractHook = useCampaignContract(blockchainId ?? undefined)
-  const { campaignData, handleFinalize, handleRefund, isFinalizePending, isRefundPending } = contractHook
+  const {
+    campaignData,
+    handleFinalize,
+    handleRefund,
+    isFinalizePending,
+    isRefundPending,
+    hasClaimedRefund,
+    userPledgeAmount,
+  } = contractHook
 
   const refreshCampaignData = async () => {
     try {
@@ -70,7 +79,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       setBlockchainFunding({
         raised,
         goal,
-        backers: 0, // We'll need to add a way to get this from the contract
+        backers: 0,
       })
 
       setCampaign((prev: any) => ({
@@ -116,9 +125,20 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       console.error("[v0] No blockchain campaign ID")
       return
     }
+
+    const pledgeAmountInUsdc = Number(userPledgeAmount) / 1e6
+    const confirmed = window.confirm(
+      `Are you sure you want to claim your refund of $${pledgeAmountInUsdc.toFixed(2)} USDC?`,
+    )
+
+    if (!confirmed) {
+      return
+    }
+
     try {
       await handleRefund(blockchainId)
-      window.location.reload()
+      blockchainDataLoaded.current = false
+      await refreshCampaignData()
     } catch (error) {
       console.error("[v0] Failed to refund:", error)
     }
@@ -144,11 +164,11 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
         const amountNumber = Number.parseFloat(pledgeData.amount)
 
         await savePledgeToDatabase({
-          campaignId: campaign.id, // Use database ID, not blockchain ID
+          campaignId: campaign.id,
           backerWalletAddress: pledgeData.backerAddress,
           amount: amountNumber,
           txHash: pledgeData.hash,
-          blockNumber: 0, // Block number will be set to 0 for now
+          blockNumber: 0,
         })
 
         console.log("[v0] Pledge saved to database successfully")
@@ -161,12 +181,16 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     await refreshCampaignData()
   }
 
-  const displayRaised = blockchainFunding?.raised ?? campaign.raised_amount
-  const displayGoal = blockchainFunding?.goal ?? campaign.goal_amount
-  const progressPercentage = (displayRaised / displayGoal) * 100
+  const displayRaised = blockchainFunding?.raised ?? (Number(campaign.raised_amount) || 0)
+  const displayGoal = blockchainFunding?.goal ?? (Number(campaign.goal_amount) || 0)
+  const progressPercentage = displayGoal > 0 ? (displayRaised / displayGoal) * 100 : 0
   const daysLeft =
     campaign.daysLeft ||
     Math.max(0, Math.floor((new Date(campaign.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+
+  const deadlineTimestamp = Math.floor(new Date(campaign.end_date).getTime() / 1000)
+  const deadlineInfo = formatDeadline(deadlineTimestamp)
+  const hasDeadlinePassed = isDeadlinePassed(deadlineTimestamp)
 
   const isCreator = address && creatorWalletAddress && address.toLowerCase() === creatorWalletAddress.toLowerCase()
 
@@ -176,6 +200,13 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     isCreator,
     blockchainId,
   })
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(amount)
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -260,8 +291,8 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
               <CardContent className="space-y-4">
                 <div>
                   <div className="flex justify-between items-center mb-2">
-                    <span className="text-2xl font-bold text-primary">${displayRaised.toLocaleString()}</span>
-                    <span className="text-sm text-muted-foreground">of ${displayGoal.toLocaleString()}</span>
+                    <span className="text-2xl font-bold text-primary">${formatCurrency(displayRaised)}</span>
+                    <span className="text-sm text-muted-foreground">of ${formatCurrency(displayGoal)}</span>
                   </div>
                   <Progress value={progressPercentage} className="h-2" />
                   <div className="flex justify-between items-center mt-2 text-sm text-muted-foreground">
@@ -279,6 +310,17 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   <div className="flex items-center gap-2">
                     <span>⏰</span>
                     <span className="text-sm text-muted-foreground">{daysLeft} days</span>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-muted rounded-lg space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Deadline (Local):</span>
+                    <span className="font-medium">{deadlineInfo.localDate}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Deadline (UTC):</span>
+                    <span className="font-medium">{deadlineInfo.utcDate} 23:59:59</span>
                   </div>
                 </div>
 
@@ -317,7 +359,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
 
                 {isCreator && blockchainId && (
                   <>
-                    {daysLeft === 0 && campaign.status === "ACTIVE" && (
+                    {hasDeadlinePassed && campaign.status === "ACTIVE" && (
                       <div className="space-y-2">
                         <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
                           <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">⏰ Campaign Ended</p>
@@ -337,31 +379,68 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                     )}
 
                     {campaign.status === "FUNDED" && (
-                      <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                        <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Campaign Successful!</p>
-                        <p className="text-green-800 dark:text-green-200">
-                          Your campaign reached its goal. You can now withdraw the funds.
-                        </p>
+                      <div className="space-y-2">
+                        <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+                          <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Campaign Successful!</p>
+                          <p className="text-green-800 dark:text-green-200 mb-2">
+                            Your campaign reached its goal. Funds have been automatically released to your wallet.
+                          </p>
+                          <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span className="text-green-700 dark:text-green-300">Total Raised:</span>
+                              <span className="font-medium">${formatCurrency(displayRaised)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-green-700 dark:text-green-300">Platform Fee (5%):</span>
+                              <span className="font-medium">-${formatCurrency(displayRaised * 0.05)}</span>
+                            </div>
+                            <div className="flex justify-between border-t border-green-200 dark:border-green-800 pt-1 mt-1">
+                              <span className="text-green-700 dark:text-green-300 font-medium">You Received:</span>
+                              <span className="font-bold">${formatCurrency(displayRaised * 0.95)}</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     )}
                   </>
                 )}
 
-                {campaign.status === "FAILED" && blockchainId && !isCreator && (
+                {!isCreator && campaign.status === "FAILED" && blockchainId && (
                   <div className="space-y-2">
-                    <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg text-sm">
-                      <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">❌ Campaign Failed</p>
-                      <p className="text-orange-800 dark:text-orange-200">
-                        This campaign did not reach its goal. You can claim a refund for your pledge.
-                      </p>
-                    </div>
-                    <Button
-                      className="w-full bg-orange-600 hover:bg-orange-700"
-                      onClick={handleRefundClick}
-                      disabled={isRefundPending}
-                    >
-                      {isRefundPending ? "Processing Refund..." : "Claim Refund"}
-                    </Button>
+                    {hasClaimedRefund ? (
+                      <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+                        <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Refund Claimed</p>
+                        <p className="text-green-800 dark:text-green-200">
+                          You have successfully claimed your refund of ${(Number(userPledgeAmount) / 1e6).toFixed(2)}{" "}
+                          USDC.
+                        </p>
+                      </div>
+                    ) : userPledgeAmount > 0n ? (
+                      <>
+                        <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg text-sm">
+                          <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">❌ Campaign Failed</p>
+                          <p className="text-orange-800 dark:text-orange-200">
+                            This campaign did not reach its goal. You can claim a refund for your pledge of $
+                            {(Number(userPledgeAmount) / 1e6).toFixed(2)} USDC.
+                          </p>
+                        </div>
+                        <Button
+                          className="w-full bg-orange-600 hover:bg-orange-700"
+                          onClick={handleRefundClick}
+                          disabled={isRefundPending}
+                        >
+                          {isRefundPending
+                            ? "Processing Refund..."
+                            : `Claim Refund ($${(Number(userPledgeAmount) / 1e6).toFixed(2)} USDC)`}
+                        </Button>
+                      </>
+                    ) : (
+                      <div className="p-3 bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-800 rounded-lg text-sm">
+                        <p className="text-gray-800 dark:text-gray-200">
+                          You did not pledge to this campaign, so there is no refund to claim.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </CardContent>

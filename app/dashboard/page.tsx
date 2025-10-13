@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DollarSign, Users, Heart, Target, Award, Plus, Clock } from "lucide-react"
+import { DollarSign, Users, Heart, Target, Award, Plus, Clock, AlertCircle } from "lucide-react"
 import Link from "next/link"
 import { getCampaignsByCreator, getCampaignsByBacker, getUserPledgeStats } from "@/lib/actions/campaigns"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -159,6 +159,27 @@ export default function DashboardPage() {
     return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)))
   }
 
+  function isDeadlinePassed(endDate: string): boolean {
+    const end = new Date(endDate)
+    const now = new Date()
+    return now.getTime() > end.getTime()
+  }
+
+  function getStatusBadgeVariant(status: string): "default" | "secondary" | "destructive" | "outline" {
+    switch (status) {
+      case "ACTIVE":
+        return "default"
+      case "FUNDED":
+        return "default"
+      case "FAILED":
+        return "destructive"
+      case "DRAFT":
+        return "secondary"
+      default:
+        return "outline"
+    }
+  }
+
   if (!address) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -292,15 +313,38 @@ export default function DashboardPage() {
                   const progressPercentage = (Number(campaign.raised_amount) / Number(campaign.goal_amount)) * 100
                   const isDraft = campaign.status === "DRAFT"
                   const isNotDeployed = !campaign.blockchain_campaign_id
+                  const deadlinePassed = isDeadlinePassed(campaign.end_date)
+                  const canFinalize = deadlinePassed && campaign.status === "ACTIVE"
+                  const isFunded = campaign.status === "FUNDED"
+                  const isFailed = campaign.status === "FAILED"
 
                   return (
                     <div key={campaign.id} className="border rounded-lg p-6">
+                      {canFinalize && (
+                        <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-950">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Action Required:</strong> This campaign has reached its deadline. Click "View
+                            Campaign" to finalize it.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       {isDraft && isNotDeployed && (
                         <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
                           <span className="text-lg">⚠️</span>
                           <AlertDescription>
                             <strong>Campaign Not Live:</strong> This campaign is saved as a draft. Deploy it to the
                             blockchain to make it live and start accepting pledges.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
+                      {isFunded && (
+                        <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-950">
+                          <span className="text-lg">✅</span>
+                          <AlertDescription>
+                            <strong>Campaign Successful!</strong> Funds have been automatically released to your wallet.
                           </AlertDescription>
                         </Alert>
                       )}
@@ -322,26 +366,21 @@ export default function DashboardPage() {
                               </span>
                               <span className="flex items-center">
                                 <Clock className="h-4 w-4 mr-1" />
-                                {daysLeft} days left
+                                {deadlinePassed ? "Ended" : `${daysLeft} days left`}
                               </span>
                             </div>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <Badge
-                            variant={
-                              campaign.status === "ACTIVE"
-                                ? "default"
-                                : campaign.status === "DRAFT"
-                                  ? "secondary"
-                                  : "outline"
-                            }
-                          >
-                            {campaign.status}
-                          </Badge>
+                          <Badge variant={getStatusBadgeVariant(campaign.status)}>{campaign.status}</Badge>
                           {isDraft && isNotDeployed && (
                             <Badge variant="outline" className="text-xs border-yellow-500 text-yellow-700">
                               Not Deployed
+                            </Badge>
+                          )}
+                          {canFinalize && (
+                            <Badge variant="outline" className="text-xs border-blue-500 text-blue-700">
+                              Needs Finalize
                             </Badge>
                           )}
                         </div>
@@ -371,7 +410,9 @@ export default function DashboardPage() {
                           </>
                         ) : (
                           <Button variant="outline" size="sm" asChild>
-                            <Link href={`/campaigns/${campaign.id}`}>View Campaign</Link>
+                            <Link href={`/campaigns/${campaign.id}`}>
+                              {canFinalize ? "Finalize Campaign" : "View Campaign"}
+                            </Link>
                           </Button>
                         )}
                       </div>
@@ -395,9 +436,22 @@ export default function DashboardPage() {
                 {backedCampaigns.map((campaign: any) => {
                   const daysLeft = getDaysLeft(campaign.end_date)
                   const progressPercentage = (Number(campaign.raised_amount) / Number(campaign.goal_amount)) * 100
+                  const deadlinePassed = isDeadlinePassed(campaign.end_date)
+                  const isFailed = campaign.status === "FAILED"
+                  const canClaimRefund = isFailed && deadlinePassed
 
                   return (
                     <div key={campaign.id} className="border rounded-lg p-6">
+                      {canClaimRefund && (
+                        <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>
+                            <strong>Refund Available:</strong> This campaign did not reach its goal. You can claim your
+                            refund.
+                          </AlertDescription>
+                        </Alert>
+                      )}
+
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex space-x-4">
                           <img
@@ -415,7 +469,7 @@ export default function DashboardPage() {
                               </span>
                               <span className="flex items-center">
                                 <Clock className="h-4 w-4 mr-1" />
-                                {daysLeft} days left
+                                {deadlinePassed ? "Ended" : `${daysLeft} days left`}
                               </span>
                               <span className="flex items-center font-medium text-primary">
                                 <Heart className="h-4 w-4 mr-1 fill-primary" />
@@ -424,17 +478,14 @@ export default function DashboardPage() {
                             </div>
                           </div>
                         </div>
-                        <Badge
-                          variant={
-                            campaign.status === "ACTIVE"
-                              ? "default"
-                              : campaign.status === "DRAFT"
-                                ? "secondary"
-                                : "outline"
-                          }
-                        >
-                          {campaign.status}
-                        </Badge>
+                        <div className="flex flex-col items-end gap-2">
+                          <Badge variant={getStatusBadgeVariant(campaign.status)}>{campaign.status}</Badge>
+                          {canClaimRefund && (
+                            <Badge variant="outline" className="text-xs border-orange-500 text-orange-700">
+                              Refund Available
+                            </Badge>
+                          )}
+                        </div>
                       </div>
 
                       <div className="space-y-2">
@@ -448,7 +499,9 @@ export default function DashboardPage() {
 
                       <div className="flex justify-end space-x-2 mt-4">
                         <Button variant="outline" size="sm" asChild>
-                          <Link href={`/campaigns/${campaign.id}`}>View Campaign</Link>
+                          <Link href={`/campaigns/${campaign.id}`}>
+                            {canClaimRefund ? "Claim Refund" : "View Campaign"}
+                          </Link>
                         </Button>
                       </div>
                     </div>
