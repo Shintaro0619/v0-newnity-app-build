@@ -39,6 +39,13 @@ export const config = createConfig({
     injected(),
     walletConnect({
       projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "demo-project-id-please-replace",
+      showQrModal: true,
+      metadata: {
+        name: "Newnity",
+        description: "Decentralized Crowdfunding Platform",
+        url: typeof window !== "undefined" ? window.location.origin : "https://newnity.app",
+        icons: ["https://newnity.app/icon.png"],
+      },
     }),
   ],
   transports: {
@@ -52,13 +59,13 @@ export const CONTRACT_ADDRESSES = {
   // Base Sepolia (testnet)
   [baseSepolia.id]: {
     MOCK_USDC: (process.env.NEXT_PUBLIC_MOCK_USDC_BASE_SEPOLIA ||
-      "0xf6a99087519a7D86899aA73Eba522DF8FDD47121") as `0x${string}`,
+      "0xC08b4C06eBd87DF46c28B620E71463bd7567F9bB") as `0x${string}`, // Deployed Mock USDC
     ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE_SEPOLIA ||
-      "0x77247cc270768611eb2fbc7759a7b34b9fb045cd") as `0x${string}`,
+      "0x6C52550E28152404c03f36089f9f652304C2AB51") as `0x${string}`, // Deployed Escrow contract
   },
   // Base Mainnet
   [base.id]: {
-    MOCK_USDC: (process.env.NEXT_PUBLIC_USDC_BASE || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`, // Real USDC on Base
+    MOCK_USDC: (process.env.NEXT_PUBLIC_USDC_BASE || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`,
     ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE ||
       "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },

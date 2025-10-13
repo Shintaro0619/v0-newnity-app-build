@@ -8,6 +8,7 @@ import { USDC_ABI } from "@/lib/contracts/usdc-abi"
 import { getContractAddress } from "@/lib/contracts/contract-addresses"
 import { baseSepolia } from "wagmi/chains"
 import { savePledgeToDatabase } from "@/lib/actions/campaigns"
+import { useEffect } from "react"
 
 export function useCampaignContract(campaignId?: number) {
   const { address, chainId = baseSepolia.id } = useAccount()
@@ -15,8 +16,7 @@ export function useCampaignContract(campaignId?: number) {
   const usdcAddress = getContractAddress(chainId, "usdc")
   const publicClient = usePublicClient()
 
-  // Read campaign data
-  const { data: campaignData, refetch: refetchCampaign } = useReadContract({
+  const { data: campaignDataRaw, refetch: refetchCampaign } = useReadContract({
     address: escrowAddress,
     abi: CAMPAIGN_ESCROW_ABI,
     functionName: "getCampaign",
@@ -26,27 +26,61 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  // Check if campaign is active
-  const { data: isActive } = useReadContract({
-    address: escrowAddress,
-    abi: CAMPAIGN_ESCROW_ABI,
-    functionName: "isActive",
-    args: campaignId !== undefined ? [BigInt(campaignId)] : undefined,
-    query: {
-      enabled: campaignId !== undefined,
-    },
-  })
+  useEffect(() => {
+    if (campaignId !== undefined) {
+      console.log("[v0] getCampaign raw response:", {
+        campaignId,
+        rawData: campaignDataRaw,
+        rawDataType: typeof campaignDataRaw,
+        isArray: Array.isArray(campaignDataRaw),
+        length: Array.isArray(campaignDataRaw) ? campaignDataRaw.length : "N/A",
+        values: Array.isArray(campaignDataRaw)
+          ? campaignDataRaw.map((v, i) => ({ index: i, value: v?.toString(), type: typeof v }))
+          : "Not an array",
+      })
+    }
+  }, [campaignDataRaw, campaignId])
 
-  // Get user's pledge amount
-  const { data: pledgeAmount } = useReadContract({
+  const campaignData = campaignDataRaw
+    ? {
+        creator: campaignDataRaw[0] as `0x${string}`,
+        goal: campaignDataRaw[1] as bigint,
+        totalPledged: campaignDataRaw[2] as bigint,
+        deadline: campaignDataRaw[3] as bigint,
+        finalized: campaignDataRaw[4] as boolean,
+        successful: campaignDataRaw[5] as boolean,
+        platformFeePercent: campaignDataRaw[6] as bigint,
+      }
+    : undefined
+
+  useEffect(() => {
+    if (campaignData) {
+      console.log("[v0] Parsed campaign data:", {
+        creator: campaignData.creator,
+        goal: campaignData.goal?.toString(),
+        totalPledged: campaignData.totalPledged?.toString(),
+        deadline: campaignData.deadline?.toString(),
+        finalized: campaignData.finalized,
+        successful: campaignData.successful,
+        platformFeePercent: campaignData.platformFeePercent?.toString(),
+      })
+    }
+  }, [campaignData])
+
+  const isActive =
+    campaignData && !campaignData.finalized && Number(campaignData.deadline) > Date.now() / 1000 ? true : false
+
+  const { data: pledgeDataRaw } = useReadContract({
     address: escrowAddress,
     abi: CAMPAIGN_ESCROW_ABI,
-    functionName: "getPledgeAmount",
+    functionName: "getPledge",
     args: campaignId !== undefined && address ? [BigInt(campaignId), address] : undefined,
     query: {
       enabled: campaignId !== undefined && !!address,
     },
   })
+
+  const pledgeAmount = pledgeDataRaw ? (pledgeDataRaw[0] as bigint) : undefined
 
   // Check USDC balance
   const { data: usdcBalance } = useReadContract({
@@ -76,7 +110,20 @@ export function useCampaignContract(campaignId?: number) {
   })
 
   // Pledge to campaign
-  const { writeContract: pledge, data: pledgeHash, isPending: isPledgePending } = useWriteContract()
+  const { writeContract: pledge, data: pledgeHash, isPending: isPledgePending, error: pledgeError } = useWriteContract()
+
+  useEffect(() => {
+    console.log("[v0] Pledge hash changed:", {
+      pledgeHash: pledgeHash || "undefined",
+      isPledgePending,
+      hasError: !!pledgeError,
+    })
+
+    if (pledgeError) {
+      console.error("[v0] Pledge error:", pledgeError)
+      toast.error(`Pledge failed: ${pledgeError.message}`)
+    }
+  }, [pledgeHash, isPledgePending, pledgeError])
 
   const { isLoading: isPledgeLoading, isSuccess: isPledgeSuccess } = useWaitForTransactionReceipt({
     hash: pledgeHash,
@@ -85,9 +132,10 @@ export function useCampaignContract(campaignId?: number) {
       toast.success("Pledge successful!")
       refetchCampaign()
 
-      // Save pledge to database
       if (campaignId && address && pledgeHash) {
         try {
+          console.log("[v0] Attempting to save pledge to database...")
+
           // Extract pledge amount from transaction logs
           const pledgeLog = receipt.logs.find((log) => {
             try {
@@ -102,31 +150,55 @@ export function useCampaignContract(campaignId?: number) {
             }
           })
 
-          if (pledgeLog) {
-            const decoded = decodeEventLog({
-              abi: CAMPAIGN_ESCROW_ABI,
-              data: pledgeLog.data,
-              topics: pledgeLog.topics,
-            })
+          if (!pledgeLog) {
+            console.error("[v0] PledgeMade event not found in transaction logs")
+            return
+          }
 
-            // Get campaign ID from database using blockchain campaign ID
-            const response = await fetch(`/api/campaigns?blockchainId=${campaignId}`)
-            const campaigns = await response.json()
+          const decoded = decodeEventLog({
+            abi: CAMPAIGN_ESCROW_ABI,
+            data: pledgeLog.data,
+            topics: pledgeLog.topics,
+          })
 
-            if (campaigns && campaigns.length > 0) {
-              const campaign = campaigns[0]
-              const amountInUsdc = Number(decoded.args.amount) / 1e6 // Convert from wei to USDC
+          console.log("[v0] Decoded pledge event:", decoded)
 
-              await savePledgeToDatabase({
-                campaignId: campaign.id,
-                backerWalletAddress: address,
-                amount: amountInUsdc,
-                txHash: pledgeHash,
-                blockNumber: Number(receipt.blockNumber),
-              })
+          const response = await fetch(`/api/campaigns/${campaignId}/by-blockchain-id`)
 
-              console.log("[v0] Pledge saved to database successfully")
-            }
+          if (!response.ok) {
+            console.error("[v0] Failed to fetch campaign from database:", response.statusText)
+            return
+          }
+
+          const campaign = await response.json()
+
+          if (!campaign || !campaign.id) {
+            console.error("[v0] Campaign not found in database for blockchain ID:", campaignId)
+            return
+          }
+
+          const amountInUsdc = Number(decoded.args.amount) / 1e6 // Convert from wei to USDC
+
+          console.log("[v0] Saving pledge with data:", {
+            campaignId: campaign.id,
+            backerWalletAddress: address,
+            amount: amountInUsdc,
+            txHash: pledgeHash,
+            blockNumber: Number(receipt.blockNumber),
+          })
+
+          const result = await savePledgeToDatabase({
+            campaignId: campaign.id,
+            backerWalletAddress: address,
+            amount: amountInUsdc,
+            txHash: pledgeHash,
+            blockNumber: Number(receipt.blockNumber),
+          })
+
+          if (result.success) {
+            console.log("[v0] Pledge saved to database successfully")
+          } else {
+            console.error("[v0] Failed to save pledge to database:", result.error)
           }
         } catch (error) {
           console.error("[v0] Failed to save pledge to database:", error)
@@ -189,6 +261,7 @@ export function useCampaignContract(campaignId?: number) {
     console.log("[v0] Calling pledge contract function with:", {
       campaignId: BigInt(campaignId).toString(),
       amountInWei: amountInWei.toString(),
+      escrowAddress,
     })
 
     try {
@@ -197,6 +270,7 @@ export function useCampaignContract(campaignId?: number) {
         abi: CAMPAIGN_ESCROW_ABI,
         functionName: "pledge",
         args: [BigInt(campaignId), amountInWei],
+        gas: 500000n,
       })
       console.log("[v0] pledge() function called successfully")
     } catch (error) {
@@ -215,6 +289,7 @@ export function useCampaignContract(campaignId?: number) {
 
       console.log("[v0] Calling createCampaign with:", {
         goalInWei: goalInWei.toString(),
+        goalInUSDC: goal,
         durationDays: durationDays.toString(),
         platformFeePercent: feeInBasisPoints.toString(),
       })
@@ -224,6 +299,7 @@ export function useCampaignContract(campaignId?: number) {
         abi: CAMPAIGN_ESCROW_ABI,
         functionName: "createCampaign",
         args: [goalInWei, durationDays, feeInBasisPoints],
+        gas: 500000n,
       })
     } catch (error) {
       console.error("[v0] handleCreateCampaign error:", error)
@@ -237,6 +313,7 @@ export function useCampaignContract(campaignId?: number) {
       abi: CAMPAIGN_ESCROW_ABI,
       functionName: "finalizeCampaign",
       args: [BigInt(campaignId)],
+      gas: 500000n,
     })
   }
 
@@ -244,8 +321,9 @@ export function useCampaignContract(campaignId?: number) {
     refund({
       address: escrowAddress,
       abi: CAMPAIGN_ESCROW_ABI,
-      functionName: "refund",
+      functionName: "claimRefund",
       args: [BigInt(campaignId)],
+      gas: 500000n,
     })
   }
 
@@ -307,6 +385,7 @@ export function useCampaignContract(campaignId?: number) {
     isPledgeLoading,
     isPledgeSuccess,
     pledgeHash,
+    pledgeError,
 
     // Create campaign
     handleCreateCampaign,

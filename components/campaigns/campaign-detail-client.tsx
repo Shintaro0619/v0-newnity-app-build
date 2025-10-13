@@ -49,9 +49,25 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     try {
-      const raised = Number(formatUnits(campaignData.totalPledged, 6))
-      const goal = Number(formatUnits(campaignData.goal, 6))
-      const daysLeft = Math.max(0, Math.floor((Number(campaignData.deadline) - Date.now() / 1000) / 86400))
+      const raisedBigInt = campaignData.totalPledged
+      const goalBigInt = campaignData.goal
+      const deadlineBigInt = campaignData.deadline
+
+      if (!raisedBigInt || !goalBigInt || !deadlineBigInt) {
+        return
+      }
+
+      const raised = Number(formatUnits(raisedBigInt, 6))
+      const goal = Number(formatUnits(goalBigInt, 6))
+      const daysLeft = Math.max(0, Math.floor((Number(deadlineBigInt) - Date.now() / 1000) / 86400))
+
+      console.log("[v0] Blockchain data loaded successfully:", {
+        raised,
+        goal,
+        daysLeft,
+        finalized: campaignData.finalized,
+        successful: campaignData.successful,
+      })
 
       setCampaign((prev: any) => ({
         ...prev,

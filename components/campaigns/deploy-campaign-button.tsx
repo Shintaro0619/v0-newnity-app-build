@@ -2,9 +2,11 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { useCampaignContract } from "@/lib/hooks/use-campaign-contract"
-import { useAccount, useWaitForTransactionReceipt } from "wagmi"
+import { useAccount, useWaitForTransactionReceipt, useReadContract, usePublicClient, useWriteContract } from "wagmi"
 import { toast } from "sonner"
+import { getContractAddress } from "@/lib/wagmi"
+import { CAMPAIGN_ESCROW_ABI } from "@/lib/contracts/campaign-escrow-abi"
+import { parseUnits, decodeEventLog } from "viem"
 
 interface DeployCampaignButtonProps {
   campaign: {
@@ -16,12 +18,36 @@ interface DeployCampaignButtonProps {
 
 export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
   const [isDeploying, setIsDeploying] = useState(false)
-  const { address } = useAccount()
-  const { handleCreateCampaign, createHash, isCreatePending, createError, extractCampaignIdFromReceipt } =
-    useCampaignContract()
+  const { address, chainId } = useAccount()
+  const publicClient = usePublicClient()
+
+  const { writeContract, data: createHash, isPending: isCreatePending, error: createError } = useWriteContract()
 
   const { isLoading: isConfirming, isSuccess: isConfirmed } = useWaitForTransactionReceipt({
     hash: createHash,
+  })
+
+  const escrowAddress = chainId ? getContractAddress(chainId, "ESCROW_VAULT") : undefined
+
+  const { data: usdcAddress } = useReadContract({
+    address: escrowAddress,
+    abi: CAMPAIGN_ESCROW_ABI,
+    functionName: "usdcToken",
+    query: { enabled: !!escrowAddress },
+  })
+
+  const { data: platformWallet } = useReadContract({
+    address: escrowAddress,
+    abi: CAMPAIGN_ESCROW_ABI,
+    functionName: "platformWallet",
+    query: { enabled: !!escrowAddress },
+  })
+
+  const { data: nextCampaignId } = useReadContract({
+    address: escrowAddress,
+    abi: CAMPAIGN_ESCROW_ABI,
+    functionName: "nextCampaignId",
+    query: { enabled: !!escrowAddress },
   })
 
   const handleDeploy = async () => {
@@ -30,30 +56,112 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
       return
     }
 
-    setIsDeploying(true)
+    if (!publicClient || !escrowAddress) {
+      toast.error("Contract not available")
+      return
+    }
+
+    console.log("[v0] ===== STARTING DEPLOYMENT =====")
+
+    const goalInWei = parseUnits(campaign.goalAmount.toString(), 6)
+    const durationDays = BigInt(campaign.duration)
+    const feeInBasisPoints = BigInt(500)
+
+    console.log("[v0] Transaction parameters:", {
+      goalInWei: goalInWei.toString(),
+      durationDays: durationDays.toString(),
+      feeInBasisPoints: feeInBasisPoints.toString(),
+    })
 
     try {
-      console.log("[v0] Deploying campaign to blockchain:", {
-        goal: campaign.goalAmount,
-        duration: campaign.duration,
+      console.log("[v0] Step 1: Simulating transaction...")
+
+      const { result } = await publicClient.simulateContract({
+        address: escrowAddress,
+        abi: CAMPAIGN_ESCROW_ABI,
+        functionName: "createCampaign",
+        args: [goalInWei, durationDays, feeInBasisPoints],
+        account: address,
       })
 
-      await handleCreateCampaign(campaign.goalAmount.toString(), campaign.duration, 500)
+      console.log("[v0] ✓ Simulation successful!")
+      console.log("[v0] Expected campaign ID:", result.toString())
 
-      console.log("[v0] Transaction initiated, hash will be available soon...")
-    } catch (error) {
-      console.error("[v0] Deployment failed:", error)
+      console.log("[v0] Step 2: Estimating gas...")
+
+      const estimatedGas = await publicClient.estimateContractGas({
+        address: escrowAddress,
+        abi: CAMPAIGN_ESCROW_ABI,
+        functionName: "createCampaign",
+        args: [goalInWei, durationDays, feeInBasisPoints],
+        account: address,
+      })
+
+      console.log("[v0] ✓ Gas estimated:", estimatedGas.toString())
+
+      const gasLimit = (estimatedGas * 150n) / 100n
+
+      console.log("[v0] Step 3: Executing transaction with gas limit:", gasLimit.toString())
+
+      setIsDeploying(true)
+
+      writeContract({
+        address: escrowAddress,
+        abi: CAMPAIGN_ESCROW_ABI,
+        functionName: "createCampaign",
+        args: [goalInWei, durationDays, feeInBasisPoints],
+        gas: gasLimit,
+      })
+
+      console.log("[v0] ✓ Transaction initiated")
+    } catch (error: any) {
+      console.error("[v0] ✗ Deployment failed:", error)
       setIsDeploying(false)
 
-      if (error instanceof Error) {
+      if (error.message) {
+        console.error("[v0] Error details:", error.message)
+
         if (error.message.includes("User rejected") || error.message.includes("user rejected")) {
           toast.error("Transaction rejected by user")
+        } else if (error.message.includes("insufficient funds")) {
+          toast.error("Insufficient funds for gas fees")
+        } else if (error.message.includes("execution reverted")) {
+          toast.error("Contract rejected the transaction. Please check the parameters.")
         } else {
-          toast.error(error.message)
+          toast.error(`Deployment failed: ${error.message.substring(0, 100)}`)
         }
       } else {
         toast.error("Failed to deploy campaign")
       }
+    }
+  }
+
+  const extractCampaignIdFromReceipt = async (txHash: `0x${string}`): Promise<number | null> => {
+    if (!publicClient) return null
+
+    try {
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash })
+
+      for (const log of receipt.logs) {
+        try {
+          const decoded = decodeEventLog({
+            abi: CAMPAIGN_ESCROW_ABI,
+            data: log.data,
+            topics: log.topics,
+          })
+
+          if (decoded.eventName === "CampaignCreated") {
+            return Number(decoded.args.campaignId)
+          }
+        } catch {
+          continue
+        }
+      }
+
+      return null
+    } catch (error) {
+      console.error("[v0] Failed to extract campaign ID:", error)
+      return null
     }
   }
 
@@ -84,7 +192,6 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
           console.log("[v0] Transaction confirmed:", createHash)
           toast.dismiss("deploy-tx")
 
-          // Extract campaign ID from transaction receipt
           const blockchainCampaignId = await extractCampaignIdFromReceipt(createHash)
 
           if (blockchainCampaignId === null) {
@@ -93,7 +200,6 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
 
           console.log("[v0] Blockchain campaign ID:", blockchainCampaignId)
 
-          // Update database with blockchain campaign ID
           const response = await fetch("/api/campaigns/deploy", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -111,7 +217,6 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
 
           toast.success("Campaign deployed successfully!")
 
-          // Reload page to show updated state
           setTimeout(() => window.location.reload(), 1000)
         } catch (error) {
           console.error("[v0] Post-deployment failed:", error)
@@ -120,7 +225,7 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
         }
       })()
     }
-  }, [isConfirmed, createHash, campaign.id, extractCampaignIdFromReceipt])
+  }, [isConfirmed, createHash, campaign.id])
 
   const isLoading = isDeploying || isCreatePending || isConfirming
 

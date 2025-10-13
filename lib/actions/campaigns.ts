@@ -125,6 +125,8 @@ export async function getCampaigns(filters?: {
 
 export async function getCampaignById(id: string) {
   try {
+    console.log("[v0] getCampaignById called with ID:", id)
+
     const result = await sql`
       SELECT 
         c.*,
@@ -141,6 +143,8 @@ export async function getCampaignById(id: string) {
       GROUP BY c.id, u.name, u.avatar, u.bio, u.wallet_address
     `
 
+    console.log("[v0] Query result:", result.length > 0 ? "Found" : "Not found")
+
     if (!result[0]) return null
 
     const campaign = result[0]
@@ -156,7 +160,7 @@ export async function getCampaignById(id: string) {
     }
   } catch (error) {
     console.error("[v0] Error fetching campaign:", error)
-    return null
+    throw error
   }
 }
 
@@ -403,13 +407,15 @@ export async function getUserPledgeStats(walletAddress: string) {
 
 export async function savePledgeToDatabase(data: {
   campaignId: string
-  backerId: string
-  amount: string
+  backerWalletAddress: string // Changed from backerId to backerWalletAddress
+  amount: number // Changed from string to number
   txHash: string
-  blockNumber: bigint
+  blockNumber: number // Changed from bigint to number
 }) {
   try {
     console.log("[v0] Saving pledge to database:", data)
+
+    const backerId = await ensureUserExists(data.backerWalletAddress)
 
     // Create pledge record
     await sql`
@@ -427,7 +433,7 @@ export async function savePledgeToDatabase(data: {
       ) VALUES (
         gen_random_uuid(),
         ${data.campaignId},
-        ${data.backerId},
+        ${backerId},
         ${data.amount},
         'USDC',
         'CONFIRMED',

@@ -47,11 +47,14 @@ export function CampaignCard({
     },
   })
 
-  const raised = campaignData ? Number(formatUnits(campaignData.totalPledged, 6)) : initialRaised || 0
-  const goal = campaignData ? Number(formatUnits(campaignData.goal, 6)) : initialGoal || 100000
-  const daysLeft = campaignData
-    ? Math.max(0, Math.floor((Number(campaignData.deadline) - Date.now() / 1000) / 86400))
-    : initialDaysLeft || 0
+  const raised =
+    campaignData && campaignData[1] !== undefined ? Number(formatUnits(campaignData[1], 6)) : initialRaised || 0
+  const goal =
+    campaignData && campaignData[2] !== undefined ? Number(formatUnits(campaignData[2], 6)) : initialGoal || 100000
+  const daysLeft =
+    campaignData && campaignData[3] !== undefined
+      ? Math.max(0, Math.floor((Number(campaignData[3]) - Date.now() / 1000) / 86400))
+      : initialDaysLeft || 0
 
   const progress = goal > 0 ? (raised / goal) * 100 : 0
 
@@ -95,7 +98,7 @@ export function CampaignCard({
             <div className="flex items-center gap-3 text-xs text-gray-400">
               <span className="flex items-center gap-1">
                 <Users className="w-3 h-3" />
-                {initialBackers} backers
+                {initialBackers || 0} backers
               </span>
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />

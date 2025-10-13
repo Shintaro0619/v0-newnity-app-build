@@ -1,16 +1,47 @@
-# CampaignEscrow デプロイガイド（Remix IDE使用）
+# CampaignEscrow デプロイガイド（公式Base Sepolia USDC使用）
 
-このガイドでは、ブラウザだけでBase Sepoliaにスマートコントラクトをデプロイする方法を説明します。
+このガイドでは、**正しいUSDCアドレス**を使用してBase Sepoliaにスマートコントラクトをデプロイする方法を説明します。
 
-## 必要なもの
+## 📋 デプロイ情報まとめ
 
-1. MetaMaskウォレット
-2. Base Sepolia テストネットのETH（ガス代用）
-3. インターネット接続
+### 使用するアドレス
 
-## ステップ1: Base Sepoliaテストネットの追加
+\`\`\`
+USDC Token (Base Sepolia): 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+Platform Wallet: 0x77247CC270768611eb2fBc7759a7b34b9FB045Cd
+Network: Base Sepolia
+Chain ID: 84532
+\`\`\`
 
-### MetaMaskにBase Sepoliaを追加
+### コンストラクタ引数（コピー用）
+
+\`\`\`
+0x036CbD53842c5426634e7929541eC2318f3dCF7e,0x77247CC270768611eb2fBc7759a7b34b9FB045Cd
+\`\`\`
+
+---
+
+## ステップ1: Remix IDEを開く
+
+1. https://remix.ethereum.org/ にアクセス
+2. 左側の「File Explorer」タブをクリック
+
+## ステップ2: コントラクトファイルを作成
+
+1. 「contracts」フォルダを右クリック → 「New File」
+2. ファイル名: `CampaignEscrow.sol`
+3. v0プロジェクトの `contracts/CampaignEscrow_DEPLOY_THIS.sol` の内容を**全てコピー&ペースト**
+
+## ステップ3: コンパイル
+
+1. 左側の「Solidity Compiler」タブ（Sアイコン）をクリック
+2. **Compiler version: `0.8.20`** を選択
+3. 「Compile CampaignEscrow.sol」ボタンをクリック
+4. ✅ 緑のチェックマークが表示されればコンパイル成功
+
+## ステップ4: MetaMaskの準備
+
+### Base Sepoliaネットワークを追加（まだの場合）
 
 1. MetaMaskを開く
 2. ネットワーク選択（上部中央）をクリック
@@ -27,86 +58,88 @@ RPC URL: https://sepolia.base.org
 
 5. 「保存」をクリック
 
-## ステップ2: テストETHの取得
+### テストETHの取得（残高が少ない場合）
 
 1. https://www.coinbase.com/faucets/base-ethereum-goerli-faucet にアクセス
 2. あなたのウォレットアドレスを入力
 3. 「Send me ETH」をクリック
-4. 数分待つと0.1 ETH程度が届きます
-
-## ステップ3: Remix IDEでコントラクトを開く
-
-1. https://remix.ethereum.org/ にアクセス
-2. 左側の「File Explorer」タブをクリック
-3. 「contracts」フォルダを右クリック → 「New File」
-4. ファイル名: `CampaignEscrow.sol`
-5. v0プロジェクトの `contracts/CampaignEscrow.sol` の内容をコピー&ペースト
-
-## ステップ4: コンパイル
-
-1. 左側の「Solidity Compiler」タブ（Sアイコン）をクリック
-2. Compiler version: `0.8.20` を選択
-3. 「Compile CampaignEscrow.sol」ボタンをクリック
-4. 緑のチェックマークが表示されればコンパイル成功
 
 ## ステップ5: デプロイ
 
 1. 左側の「Deploy & Run Transactions」タブ（イーサリアムアイコン）をクリック
-2. ENVIRONMENT: 「Injected Provider - MetaMask」を選択
+2. **ENVIRONMENT: 「Injected Provider - MetaMask」を選択**
 3. MetaMaskが開くので「接続」をクリック
-4. ネットワークが「Base Sepolia」になっていることを確認
-5. CONTRACT: 「CampaignEscrow」を選択
-6. コンストラクタ引数を入力：
-   - `_USDCTOKEN`: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
-   - `_PLATFORMWALLET`: あなたのウォレットアドレス
-7. 「Deploy」ボタンをクリック
+4. **ネットワークが「Base Sepolia」になっていることを確認**
+5. **CONTRACT: 「CampaignEscrow」を選択**
+6. **コンストラクタ引数を入力**（下の入力欄に以下をコピー&ペースト）：
+
+\`\`\`
+0x036CbD53842c5426634e7929541eC2318f3dCF7e,0x77247CC270768611eb2fBc7759a7b34b9FB045Cd
+\`\`\`
+
+7. 🚀 **「Deploy」ボタンをクリック**
 8. MetaMaskで「確認」をクリック
 9. トランザクションが完了するまで待つ（30秒〜1分）
 
 ## ステップ6: デプロイ確認
 
 1. Remix下部の「Deployed Contracts」セクションを確認
-2. コントラクトアドレスをコピー（例: `0x1234...abcd`）
+2. **コントラクトアドレスをコピー**（例: `0x1234...abcd`）
 3. https://sepolia.basescan.org/address/[コントラクトアドレス] で確認
 
-## ステップ7: コントラクトアドレスを保存
+## ステップ7: コントラクトアドレスを記録
 
 デプロイされたコントラクトアドレスを以下に記録：
 
 \`\`\`
-CampaignEscrow Contract: 0x_____________________
-Network: Base Sepolia (Chain ID: 84532)
-USDC Token: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
-Platform Wallet: 0x_____________________
-Deployed Date: ____/____/____
+✅ CampaignEscrow Contract: 0x_____________________
+✅ Network: Base Sepolia (Chain ID: 84532)
+✅ USDC Token: 0x036CbD53842c5426634e7929541eC2318f3dCF7e
+✅ Platform Wallet: 0x77247CC270768611eb2fBc7759a7b34b9FB045Cd
+✅ Deployed Date: ____/____/____
 \`\`\`
 
-## ステップ8: v0に環境変数を追加
+## ステップ8: v0チャットでコントラクトアドレスを報告
 
-1. v0の画面右上の⚙️（設定）をクリック
-2. 「Environment Variables」を選択
-3. 以下の変数を追加：
+デプロイが完了したら、v0チャットで以下のように報告してください：
 
 \`\`\`
-NEXT_PUBLIC_ESCROW_CONTRACT_ADDRESS=0x[デプロイしたアドレス]
-NEXT_PUBLIC_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+デプロイ完了しました。
+新しいコントラクトアドレス: 0x[あなたのアドレス]
 \`\`\`
 
-## トラブルシューティング
+v0が自動的に環境変数を更新し、アプリケーションを新しいコントラクトに接続します。
 
-### エラー: "Insufficient funds"
-→ ステップ2でテストETHを取得してください
+---
 
-### エラー: "Wrong network"
+## 🔧 トラブルシューティング
+
+### ❌ エラー: "Insufficient funds"
+→ ステップ4でテストETHを取得してください
+
+### ❌ エラー: "Wrong network"
 → MetaMaskのネットワークが「Base Sepolia」になっているか確認
 
-### コンパイルエラー
-→ Compiler versionが0.8.20になっているか確認
+### ❌ コンパイルエラー
+→ Compiler versionが **0.8.20** になっているか確認
 
-### デプロイボタンが押せない
+### ❌ デプロイボタンが押せない
 → ENVIRONMENTが「Injected Provider - MetaMask」になっているか確認
+
+### ❌ コンストラクタ引数のエラー
+→ 引数が正しくコピーされているか確認（カンマで区切られた2つのアドレス）
+
+---
+
+## 📝 重要な注意事項
+
+1. **必ず公式Base Sepolia USDCアドレスを使用**: `0x036CbD53842c5426634e7929541eC2318f3dCF7e`
+2. **古いコントラクトは使用しない**: 以前のコントラクト（`0xBb2Ad789...`）は間違ったUSDCアドレスを使用しているため、使用できません
+3. **コントラクトアドレスを保存**: デプロイ後のアドレスは必ず記録してください
+
+---
 
 ## 次のステップ
 
-デプロイが完了したら、フロントエンドとの統合に進みます。
-コントラクトアドレスを保存しておいてください。
+デプロイが完了したら、v0チャットで新しいコントラクトアドレスを報告してください。
+v0が自動的にアプリケーションを更新します。

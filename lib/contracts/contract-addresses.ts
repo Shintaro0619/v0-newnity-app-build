@@ -1,9 +1,9 @@
 export const CONTRACT_ADDRESSES = {
   baseSepolia: {
     campaignEscrow: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE_SEPOLIA ||
-      "0x77247cc270768611eb2fbc7759a7b34b9fb045cd") as `0x${string}`,
+      "0x6C52550E28152404c03f36089f9f652304C2AB51") as `0x${string}`,
     usdc: (process.env.NEXT_PUBLIC_MOCK_USDC_BASE_SEPOLIA ||
-      "0xf6a99087519a7D86899aA73Eba522DF8FDD47121") as `0x${string}`,
+      "0xC08b4C06eBd87DF46c28B620E71463bd7567F9bB") as `0x${string}`,
   },
   base: {
     campaignEscrow: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE ||

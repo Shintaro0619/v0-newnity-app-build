@@ -12,10 +12,8 @@ import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { RichEditor } from "@/components/ui/rich-editor"
 import Link from "next/link"
-import { useDropzone } from "react-dropzone"
 import { useCampaignContract } from "@/lib/hooks/use-campaign-contract"
 import { useAccount } from "wagmi"
-import { parseUnits } from "viem"
 
 import { MediaUpload } from "@/components/ui/media-upload"
 
@@ -106,100 +104,6 @@ export default function CreateCampaignPage() {
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
-
-  const MediaUploadOld = ({
-    type,
-    title,
-    description,
-    acceptedTypes,
-    multiple = false,
-    files,
-    onFileChange,
-  }: {
-    type: "image" | "video"
-    title: string
-    description: string
-    acceptedTypes: string
-    multiple?: boolean
-    files: File | File[] | null
-    onFileChange: (files: File | File[] | null) => void
-  }) => {
-    const onDrop = useCallback(
-      (acceptedFiles: File[]) => {
-        if (multiple) {
-          onFileChange(acceptedFiles)
-        } else if (acceptedFiles.length > 0) {
-          onFileChange(acceptedFiles[0])
-        }
-      },
-      [onFileChange, multiple],
-    )
-
-    const { getRootProps, getInputProps, isDragActive } = useDropzone({
-      onDrop,
-      accept:
-        type === "image" ? { "image/*": [".png", ".jpg", ".jpeg", ".gif"] } : { "video/*": [".mp4", ".mov", ".avi"] },
-      multiple,
-      maxSize: type === "video" ? 100 * 1024 * 1024 : 10 * 1024 * 1024, // 100MB for video, 10MB for images
-    })
-
-    const hasFiles = multiple ? (files as File[])?.length > 0 : files !== null
-
-    return (
-      <div className="space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold">{title}</h3>
-          <p className="text-sm text-muted-foreground">{description}</p>
-        </div>
-
-        <div
-          {...getRootProps()}
-          className={`border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors ${
-            isDragActive
-              ? "border-primary bg-primary/5"
-              : hasFiles
-                ? "border-green-500 bg-green-50 dark:bg-green-950"
-                : "border-muted-foreground/25 hover:border-primary"
-          }`}
-        >
-          <input {...getInputProps()} />
-
-          {hasFiles ? (
-            <div className="space-y-2">
-              <span className="text-2xl text-green-500 mx-auto">✓</span>
-              {multiple ? (
-                <p className="font-medium text-green-700 dark:text-green-400">
-                  {(files as File[]).length} files uploaded
-                </p>
-              ) : (
-                <p className="font-medium text-green-700 dark:text-green-400">{(files as File).name}</p>
-              )}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  onFileChange(multiple ? [] : null)
-                }}
-              >
-                Remove
-              </Button>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {type === "image" ? (
-                <span className="text-2xl text-muted-foreground mx-auto">🖼️</span>
-              ) : (
-                <span className="text-2xl text-muted-foreground mx-auto">🎥</span>
-              )}
-              <p className="font-medium">{isDragActive ? "Drop the files here" : "Drag & drop or click to upload"}</p>
-              <p className="text-sm text-muted-foreground">{acceptedTypes}</p>
-            </div>
-          )}
-        </div>
-      </div>
-    )
-  }
 
   const RewardTierCard = ({
     tier,
@@ -386,28 +290,50 @@ export default function CreateCampaignPage() {
 
     setLoading(true)
     try {
-      const goalInUsdc = parseUnits(campaignData.funding.goal.toString(), 6) // USDC has 6 decimals
-      const durationInSeconds = BigInt(campaignData.funding.duration * 24 * 60 * 60)
+      const formData = new FormData()
 
-      console.log("[v0] Creating campaign on-chain:", {
-        goal: goalInUsdc.toString(),
-        duration: durationInSeconds.toString(),
+      formData.append(
+        "data",
+        JSON.stringify({
+          basic: campaignData.basic,
+          funding: campaignData.funding,
+          rewards: campaignData.rewards,
+          creatorAddress: address,
+        }),
+      )
+
+      if (campaignData.media.mainImage) {
+        formData.append("coverImage", campaignData.media.mainImage)
+      }
+
+      if (campaignData.media.gallery && campaignData.media.gallery.length > 0) {
+        campaignData.media.gallery.forEach((file) => {
+          formData.append("gallery", file)
+        })
+      }
+
+      if (campaignData.media.video) {
+        formData.append("video", campaignData.media.video)
+      }
+
+      console.log("[v0] Creating campaign with media files:", {
+        hasCoverImage: !!campaignData.media.mainImage,
+        galleryCount: campaignData.media.gallery?.length || 0,
+        hasVideo: !!campaignData.media.video,
       })
-
-      handleCreateCampaign(goalInUsdc.toString(), campaignData.funding.duration)
-
-      console.log("[v0] Campaign creation transaction submitted")
 
       const response = await fetch("/api/campaigns/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...campaignData,
-          creatorAddress: address,
-        }),
+        body: formData,
       })
 
-      if (!response.ok) throw new Error("Failed to save campaign")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Failed to save campaign")
+      }
+
+      const result = await response.json()
+      console.log("[v0] Campaign created successfully:", result)
 
       setCurrentStep(5)
     } catch (error) {
@@ -427,6 +353,31 @@ export default function CreateCampaignPage() {
   const handlePrevious = () => {
     setCurrentStep((prev) => Math.max(prev - 1, 1))
   }
+
+  const handleMainImageChange = useCallback((files: File[]) => {
+    setCampaignData((prev) => ({
+      ...prev,
+      media: { ...prev.media, mainImage: files[0] || null },
+    }))
+  }, [])
+
+  const handleGalleryChange = useCallback((files: File[]) => {
+    setCampaignData((prev) => ({
+      ...prev,
+      media: { ...prev.media, gallery: files },
+    }))
+  }, [])
+
+  const handleVideoChange = useCallback((files: File[]) => {
+    setCampaignData((prev) => ({
+      ...prev,
+      media: { ...prev.media, video: files[0] || null },
+    }))
+  }, [])
+
+  const handleMediaError = useCallback((error: string) => {
+    setErrors((prev) => ({ ...prev, media: error }))
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -577,13 +528,8 @@ export default function CreateCampaignPage() {
                       maxSize={10 * 1024 * 1024}
                       enableCompression={true}
                       showPreview={true}
-                      onFilesChange={(files) =>
-                        setCampaignData((prev) => ({
-                          ...prev,
-                          media: { ...prev.media, mainImage: files[0] || null },
-                        }))
-                      }
-                      onError={(error) => setErrors((prev) => ({ ...prev, mainImage: error }))}
+                      onFilesChange={handleMainImageChange}
+                      onError={handleMediaError}
                     />
                     {errors.mainImage && <p className="text-sm text-destructive">{errors.mainImage}</p>}
 
@@ -598,13 +544,8 @@ export default function CreateCampaignPage() {
                       maxSize={10 * 1024 * 1024}
                       enableCompression={true}
                       showPreview={true}
-                      onFilesChange={(files) =>
-                        setCampaignData((prev) => ({
-                          ...prev,
-                          media: { ...prev.media, gallery: files },
-                        }))
-                      }
-                      onError={(error) => console.error("Gallery upload error:", error)}
+                      onFilesChange={handleGalleryChange}
+                      onError={handleMediaError}
                     />
 
                     <Separator />
@@ -615,13 +556,8 @@ export default function CreateCampaignPage() {
                       description="A video pitch can significantly boost your campaign (optional)"
                       maxSize={100 * 1024 * 1024}
                       showPreview={true}
-                      onFilesChange={(files) =>
-                        setCampaignData((prev) => ({
-                          ...prev,
-                          media: { ...prev.media, video: files[0] || null },
-                        }))
-                      }
-                      onError={(error) => console.error("Video upload error:", error)}
+                      onFilesChange={handleVideoChange}
+                      onError={handleMediaError}
                     />
                   </div>
                 </div>

@@ -240,7 +240,7 @@ export function MediaUpload({
   useEffect(() => {
     const successfulFiles = mediaFiles.filter((f) => f.status === "success").map((f) => f.compressed || f.file)
     onFilesChange(successfulFiles)
-  }, [mediaFiles])
+  }, [mediaFiles, onFilesChange])
 
   return (
     <div className={`space-y-4 ${className}`}>
