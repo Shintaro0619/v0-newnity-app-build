@@ -134,7 +134,7 @@ export async function getCampaignById(id: string) {
         u.avatar as creator_avatar,
         u.bio as creator_bio,
         u.wallet_address as creator_wallet,
-        COUNT(DISTINCT p.id) as backers_count,
+        COUNT(DISTINCT p.backer_id) as backers_count,
         COALESCE(SUM(p.amount), 0) as total_pledged
       FROM campaigns c
       LEFT JOIN users u ON c.creator_id = u.id
@@ -457,6 +457,34 @@ export async function savePledgeToDatabase(data: {
     return { success: true }
   } catch (error) {
     console.error("[v0] Error saving pledge to database:", error)
+    return { success: false, error: String(error) }
+  }
+}
+
+export async function finalizeCampaignInDatabase(data: {
+  campaignId: string
+  successful: boolean
+  txHash: string
+  totalAmount: number
+}) {
+  try {
+    console.log("[v0] Finalizing campaign in database:", data)
+
+    const status = data.successful ? "FUNDED" : "FAILED"
+
+    await sql`
+      UPDATE campaigns
+      SET 
+        status = ${status},
+        raised_amount = ${data.totalAmount},
+        updated_at = NOW()
+      WHERE id = ${data.campaignId}
+    `
+
+    console.log("[v0] Campaign finalized in database successfully")
+    return { success: true }
+  } catch (error) {
+    console.error("[v0] Error finalizing campaign in database:", error)
     return { success: false, error: String(error) }
   }
 }

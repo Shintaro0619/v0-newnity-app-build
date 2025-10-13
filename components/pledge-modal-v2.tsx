@@ -16,14 +16,14 @@ interface PledgeModalV2Props {
   campaignId: bigint
   campaignTitle: string
   onClose: () => void
-  onSuccess?: () => void
+  onSuccess?: (pledgeData: { hash: string; amount: string; backerAddress: string }) => void
 }
 
 export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }: PledgeModalV2Props) {
   const [amount, setAmount] = useState("")
   const [step, setStep] = useState<"input" | "approve" | "pledge">("input")
 
-  const { isConnected } = useAccount()
+  const { isConnected, address } = useAccount()
 
   const campaignIdNumber = Number(campaignId)
 
@@ -43,52 +43,10 @@ export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }:
     pledgeError,
     escrowAddress,
     usdcAddress,
+    refetchAllowance, // Added refetchAllowance to manually refresh allowance
   } = useCampaignContract(campaignIdNumber)
 
   const campaignExistsOnChain = campaignData && campaignData.creator !== "0x0000000000000000000000000000000000000000"
-
-  useEffect(() => {
-    if (campaignData) {
-      const creator = campaignData.creator
-      const goalAmount = campaignData.goal
-      const totalPledged = campaignData.totalPledged
-      const deadline = campaignData.deadline
-      const finalized = campaignData.finalized
-
-      const now = Math.floor(Date.now() / 1000)
-      const deadlineNumber = Number(deadline)
-      const isExpired = deadlineNumber > 0 ? deadlineNumber < now : false
-      const deadlineDate = deadlineNumber > 0 ? new Date(deadlineNumber * 1000).toISOString() : "Not set"
-
-      console.log("[v0] Campaign blockchain state:", {
-        campaignId: campaignIdNumber,
-        exists: campaignExistsOnChain,
-        creator,
-        goalAmount: goalAmount?.toString(),
-        goalInUSDC: goalAmount ? formatUnits(goalAmount, 6) : "0",
-        totalPledged: totalPledged?.toString(),
-        pledgedInUSDC: totalPledged ? formatUnits(totalPledged, 6) : "0",
-        deadline: deadline?.toString(),
-        deadlineDate,
-        isExpired,
-        finalized,
-        currentTimestamp: now,
-      })
-    }
-
-    if (usdcBalance !== undefined && usdcAllowance !== undefined) {
-      console.log("[v0] USDC state:", {
-        balance: usdcBalance.toString(),
-        balanceInUSDC: formatUnits(usdcBalance, 6),
-        allowance: usdcAllowance.toString(),
-        allowanceInUSDC: formatUnits(usdcAllowance, 6),
-        usdcAddress,
-        escrowAddress,
-      })
-    }
-  }, [campaignData, campaignExistsOnChain, campaignIdNumber, usdcBalance, usdcAllowance, usdcAddress, escrowAddress])
-
-  console.log("[v0] Pledge modal opened for campaign:", campaignIdNumber)
 
   const amountInWei = amount ? BigInt(Number.parseFloat(amount) * 1e6) : 0n
   const hasEnoughBalance = usdcBalance ? usdcBalance >= amountInWei : false
@@ -100,71 +58,62 @@ export function PledgeModalV2({ campaignId, campaignTitle, onClose, onSuccess }:
   }
 
   useEffect(() => {
-    if (isApproveSuccess && step === "approve") {
-      console.log("[v0] Approval successful, advancing to pledge step")
-      setStep("pledge")
+    if (step === "pledge" && !hasEnoughAllowance && amountInWei > 0n) {
+      setStep("approve")
     }
-  }, [isApproveSuccess, step])
+  }, [step, hasEnoughAllowance, amountInWei])
 
   useEffect(() => {
-    if (isPledgeSuccess) {
-      console.log("[v0] Pledge successful, closing modal in 2 seconds")
+    if (isApproveSuccess && step === "approve") {
+      // Refetch allowance after approval
+      const checkAllowance = async () => {
+        await refetchAllowance()
+        // Wait a bit for the refetch to complete
+        setTimeout(() => {
+          if (hasEnoughAllowance) {
+            setStep("pledge")
+          }
+        }, 1000)
+      }
+      checkAllowance()
+    }
+  }, [isApproveSuccess, step, hasEnoughAllowance, refetchAllowance])
+
+  useEffect(() => {
+    if (isPledgeSuccess && pledgeHash && address) {
       setTimeout(() => {
         if (onSuccess) {
-          onSuccess()
+          onSuccess({
+            hash: pledgeHash,
+            amount,
+            backerAddress: address,
+          })
         }
         onClose()
         resetForm()
       }, 2000)
     }
-  }, [isPledgeSuccess, onClose, onSuccess])
+  }, [isPledgeSuccess, pledgeHash, address, amount, onClose, onSuccess])
 
   const handleConfirmPledge = () => {
-    console.log("[v0] Confirm Pledge clicked - Full state:", {
-      campaignIdNumber,
-      amount,
-      amountInWei: amountInWei.toString(),
-      step,
-      isPledgePending,
-      isPledgeLoading,
-      hasEnoughAllowance,
-      hasEnoughBalance,
-      campaignExistsOnChain,
-      usdcBalance: usdcBalance?.toString(),
-      usdcAllowance: usdcAllowance?.toString(),
-      escrowAddress,
-      usdcAddress,
-    })
-
     if (!amount || Number.parseFloat(amount) <= 0) {
-      console.error("[v0] Invalid amount:", amount)
       return
     }
 
     if (!hasEnoughBalance) {
-      console.error("[v0] Insufficient USDC balance:", {
-        required: amountInWei.toString(),
-        available: usdcBalance?.toString(),
-      })
       return
     }
 
     if (!hasEnoughAllowance) {
-      console.error("[v0] Insufficient allowance:", {
-        required: amountInWei.toString(),
-        approved: usdcAllowance?.toString(),
-      })
+      setStep("approve")
       return
     }
 
     if (!campaignExistsOnChain) {
-      console.error("[v0] Campaign does not exist on blockchain")
       return
     }
 
-    console.log("[v0] All validations passed, calling handlePledge...")
     handlePledge(campaignIdNumber, amount)
-    console.log("[v0] handlePledge called")
   }
 
   if (!isConnected) {

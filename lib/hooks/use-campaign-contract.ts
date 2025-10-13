@@ -26,21 +26,6 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  useEffect(() => {
-    if (campaignId !== undefined) {
-      console.log("[v0] getCampaign raw response:", {
-        campaignId,
-        rawData: campaignDataRaw,
-        rawDataType: typeof campaignDataRaw,
-        isArray: Array.isArray(campaignDataRaw),
-        length: Array.isArray(campaignDataRaw) ? campaignDataRaw.length : "N/A",
-        values: Array.isArray(campaignDataRaw)
-          ? campaignDataRaw.map((v, i) => ({ index: i, value: v?.toString(), type: typeof v }))
-          : "Not an array",
-      })
-    }
-  }, [campaignDataRaw, campaignId])
-
   const campaignData = campaignDataRaw
     ? {
         creator: campaignDataRaw[0] as `0x${string}`,
@@ -52,20 +37,6 @@ export function useCampaignContract(campaignId?: number) {
         platformFeePercent: campaignDataRaw[6] as bigint,
       }
     : undefined
-
-  useEffect(() => {
-    if (campaignData) {
-      console.log("[v0] Parsed campaign data:", {
-        creator: campaignData.creator,
-        goal: campaignData.goal?.toString(),
-        totalPledged: campaignData.totalPledged?.toString(),
-        deadline: campaignData.deadline?.toString(),
-        finalized: campaignData.finalized,
-        successful: campaignData.successful,
-        platformFeePercent: campaignData.platformFeePercent?.toString(),
-      })
-    }
-  }, [campaignData])
 
   const isActive =
     campaignData && !campaignData.finalized && Number(campaignData.deadline) > Date.now() / 1000 ? true : false
@@ -132,6 +103,13 @@ export function useCampaignContract(campaignId?: number) {
       toast.success("Pledge successful!")
       refetchCampaign()
 
+      console.log("[v0] Checking conditions for saving pledge:", {
+        campaignId,
+        address,
+        pledgeHash,
+        hasAllValues: !!(campaignId && address && pledgeHash),
+      })
+
       if (campaignId && address && pledgeHash) {
         try {
           console.log("[v0] Attempting to save pledge to database...")
@@ -152,6 +130,7 @@ export function useCampaignContract(campaignId?: number) {
 
           if (!pledgeLog) {
             console.error("[v0] PledgeMade event not found in transaction logs")
+            console.log("[v0] Available logs:", receipt.logs.length)
             return
           }
 
@@ -163,14 +142,19 @@ export function useCampaignContract(campaignId?: number) {
 
           console.log("[v0] Decoded pledge event:", decoded)
 
+          console.log("[v0] Fetching campaign from database with blockchain ID:", campaignId)
           const response = await fetch(`/api/campaigns/${campaignId}/by-blockchain-id`)
 
+          console.log("[v0] API response status:", response.status)
+
           if (!response.ok) {
-            console.error("[v0] Failed to fetch campaign from database:", response.statusText)
+            const errorText = await response.text()
+            console.error("[v0] Failed to fetch campaign from database:", response.statusText, errorText)
             return
           }
 
           const campaign = await response.json()
+          console.log("[v0] Campaign fetched from database:", campaign)
 
           if (!campaign || !campaign.id) {
             console.error("[v0] Campaign not found in database for blockchain ID:", campaignId)
@@ -195,6 +179,8 @@ export function useCampaignContract(campaignId?: number) {
             blockNumber: Number(receipt.blockNumber),
           })
 
+          console.log("[v0] savePledgeToDatabase result:", result)
+
           if (result.success) {
             console.log("[v0] Pledge saved to database successfully")
           } else {
@@ -204,6 +190,12 @@ export function useCampaignContract(campaignId?: number) {
           console.error("[v0] Failed to save pledge to database:", error)
           // Don't throw - pledge was successful on blockchain
         }
+      } else {
+        console.log("[v0] Skipping pledge save - missing required values:", {
+          campaignId: campaignId || "missing",
+          address: address || "missing",
+          pledgeHash: pledgeHash || "missing",
+        })
       }
     },
   })
@@ -228,9 +220,64 @@ export function useCampaignContract(campaignId?: number) {
 
   const { isLoading: isFinalizeLoading, isSuccess: isFinalizeSuccess } = useWaitForTransactionReceipt({
     hash: finalizeHash,
-    onSuccess: () => {
+    onSuccess: async (receipt) => {
+      console.log("[v0] Campaign finalized on blockchain:", { hash: finalizeHash, blockNumber: receipt.blockNumber })
       toast.success("Campaign finalized!")
       refetchCampaign()
+
+      // Extract finalization data from logs
+      try {
+        const finalizeLog = receipt.logs.find((log) => {
+          try {
+            const decoded = decodeEventLog({
+              abi: CAMPAIGN_ESCROW_ABI,
+              data: log.data,
+              topics: log.topics,
+            })
+            return decoded.eventName === "CampaignFinalized"
+          } catch {
+            return false
+          }
+        })
+
+        if (finalizeLog && campaignId && finalizeHash) {
+          const decoded = decodeEventLog({
+            abi: CAMPAIGN_ESCROW_ABI,
+            data: finalizeLog.data,
+            topics: finalizeLog.topics,
+          })
+
+          console.log("[v0] Decoded finalize event:", decoded)
+
+          // Fetch campaign from database
+          const response = await fetch(`/api/campaigns/${campaignId}/by-blockchain-id`)
+          if (!response.ok) {
+            console.error("[v0] Failed to fetch campaign from database")
+            return
+          }
+
+          const campaign = await response.json()
+          if (!campaign || !campaign.id) {
+            console.error("[v0] Campaign not found in database")
+            return
+          }
+
+          const totalAmountInUsdc = Number(decoded.args.totalAmount) / 1e6
+
+          // Update database
+          const { finalizeCampaignInDatabase } = await import("@/lib/actions/campaigns")
+          await finalizeCampaignInDatabase({
+            campaignId: campaign.id,
+            successful: decoded.args.successful as boolean,
+            txHash: finalizeHash,
+            totalAmount: totalAmountInUsdc,
+          })
+
+          console.log("[v0] Campaign finalized in database")
+        }
+      } catch (error) {
+        console.error("[v0] Failed to update database after finalization:", error)
+      }
     },
   })
 
