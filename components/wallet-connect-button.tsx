@@ -2,7 +2,7 @@
 
 import { useAccount, useConnect, useDisconnect } from "wagmi"
 import { Button } from "@/components/ui/button"
-import { Wallet, LogOut } from "lucide-react"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 export function WalletConnectButton() {
   const { address, isConnected } = useAccount()
@@ -15,8 +15,13 @@ export function WalletConnectButton() {
         <div className="text-sm text-gray-400">
           {address.slice(0, 6)}...{address.slice(-4)}
         </div>
-        <Button onClick={() => disconnect()} variant="outline" size="sm">
-          <LogOut className="h-4 w-4 mr-2" />
+        <Button
+          onClick={() => disconnect()}
+          variant="outline"
+          size="sm"
+          className="text-gray-300 border-gray-700 hover:bg-gray-900"
+        >
+          <span className="mr-2">🚪</span>
           Disconnect
         </Button>
       </div>
@@ -24,17 +29,24 @@ export function WalletConnectButton() {
   }
 
   return (
-    <div className="space-y-2">
-      {connectors.map((connector) => (
-        <Button
-          key={connector.id}
-          onClick={() => connect({ connector })}
-          className="w-full bg-[#1DB954] hover:bg-[#1DB954]/90 text-white"
-        >
-          <Wallet className="h-4 w-4 mr-2" />
-          Connect with {connector.name}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="text-gray-300 border-gray-700 hover:bg-gray-900 bg-transparent">
+          <span className="mr-2">👛</span>
+          Connect Wallet
         </Button>
-      ))}
-    </div>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700">
+        {connectors.map((connector) => (
+          <DropdownMenuItem
+            key={connector.id}
+            onClick={() => connect({ connector })}
+            className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
+          >
+            {connector.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

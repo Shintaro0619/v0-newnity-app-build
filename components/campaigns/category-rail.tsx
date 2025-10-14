@@ -26,7 +26,7 @@ export function CategoryRail() {
     // Mock API call - replace with actual API: GET /api/categories then GET /api/campaigns?category=xxx&limit=8
     const mockData: Record<string, Campaign[]> = {}
     CATEGORIES.forEach((category, catIndex) => {
-      mockData[category] = Array.from({ length: 8 }).map((_, i) => ({
+      mockData[category] = Array.from({ length: 6 }).map((_, i) => ({
         id: 300 + catIndex * 10 + i,
         title: `${category} Project #${i + 1}`,
         creator: `${category} Creator ${i + 1}`,
@@ -50,8 +50,8 @@ export function CategoryRail() {
           {CATEGORIES.map((category) => (
             <div key={category} className="mb-12">
               <h3 className="text-xl font-semibold text-white mb-4">{category}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {Array.from({ length: 4 }).map((_, i) => (
+              <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 3 }).map((_, i) => (
                   <div key={i} className="h-96 bg-gray-900 rounded-lg animate-pulse" />
                 ))}
               </div>
@@ -77,8 +77,8 @@ export function CategoryRail() {
                 See all {category} →
               </Link>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {campaignsByCategory[category]?.slice(0, 4).map((campaign) => (
+            <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {campaignsByCategory[category]?.slice(0, 3).map((campaign) => (
                 <CampaignCard key={campaign.id} {...campaign} />
               ))}
             </div>

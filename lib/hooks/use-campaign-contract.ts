@@ -22,7 +22,8 @@ export function useCampaignContract(campaignId?: number) {
     functionName: "getCampaign",
     args: campaignId !== undefined ? [BigInt(campaignId)] : undefined,
     query: {
-      enabled: campaignId !== undefined,
+      enabled: campaignId !== undefined && !!escrowAddress,
+      refetchInterval: false, // Disable automatic polling
     },
   })
 
@@ -47,29 +48,35 @@ export function useCampaignContract(campaignId?: number) {
     functionName: "getPledge",
     args: campaignId !== undefined && address ? [BigInt(campaignId), address] : undefined,
     query: {
-      enabled: campaignId !== undefined && !!address,
+      enabled: campaignId !== undefined && !!address && !!escrowAddress,
+      refetchInterval: false,
     },
   })
 
   const pledgeAmount = pledgeDataRaw ? (pledgeDataRaw[0] as bigint) : undefined
 
-  // Check USDC balance
   const { data: usdcBalance } = useReadContract({
     address: usdcAddress,
     abi: USDC_ABI,
     functionName: "balanceOf",
     args: address ? [address] : undefined,
+    query: {
+      enabled: !!address && !!usdcAddress,
+      refetchInterval: false,
+    },
   })
 
-  // Check USDC allowance
   const { data: usdcAllowance, refetch: refetchAllowance } = useReadContract({
     address: usdcAddress,
     abi: USDC_ABI,
     functionName: "allowance",
     args: address ? [address, escrowAddress] : undefined,
+    query: {
+      enabled: !!address && !!usdcAddress && !!escrowAddress,
+      refetchInterval: false,
+    },
   })
 
-  // Approve USDC
   const { writeContract: approveUsdc, data: approveHash, isPending: isApprovePending } = useWriteContract()
 
   const { isLoading: isApproveLoading, isSuccess: isApproveSuccess } = useWaitForTransactionReceipt({
@@ -80,7 +87,6 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  // Pledge to campaign
   const { writeContract: pledge, data: pledgeHash, isPending: isPledgePending, error: pledgeError } = useWriteContract()
 
   useEffect(() => {
@@ -200,7 +206,6 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  // Create campaign
   const {
     writeContract: createCampaign,
     data: createHash,
@@ -215,7 +220,6 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  // Finalize campaign
   const { writeContract: finalizeCampaign, data: finalizeHash, isPending: isFinalizePending } = useWriteContract()
 
   const { isLoading: isFinalizeLoading, isSuccess: isFinalizeSuccess } = useWaitForTransactionReceipt({
@@ -322,7 +326,6 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  // Refund
   const { writeContract: refund, data: refundHash, isPending: isRefundPending } = useWriteContract()
 
   const { isLoading: isRefundLoading, isSuccess: isRefundSuccess } = useWaitForTransactionReceipt({
@@ -378,7 +381,8 @@ export function useCampaignContract(campaignId?: number) {
     functionName: "getPledge",
     args: campaignId !== undefined && address ? [BigInt(campaignId), address] : undefined,
     query: {
-      enabled: campaignId !== undefined && !!address,
+      enabled: campaignId !== undefined && !!address && !!escrowAddress,
+      refetchInterval: false,
     },
   })
 

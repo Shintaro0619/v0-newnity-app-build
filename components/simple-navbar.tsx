@@ -1,26 +1,27 @@
 "use client"
 
+import type React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
-import { useAccount, useConnect, useDisconnect } from "wagmi"
+import { Input } from "@/components/ui/input"
+import { Search, X } from "lucide-react"
 import { useState } from "react"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
+
+const WalletButton = dynamic(() => import("@/components/wallet-button"), { ssr: false })
 
 export function SimpleNavbar() {
-  const { address, isConnected } = useAccount()
-  const { connectors, connect } = useConnect()
-  const { disconnect } = useDisconnect()
-  const [isConnecting, setIsConnecting] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const router = useRouter()
 
-  const handleConnect = async (connector: any) => {
-    setIsConnecting(true)
-    try {
-      await connect({ connector })
-    } catch (error) {
-      console.error("[v0] Wallet connection error:", error)
-    } finally {
-      setIsConnecting(false)
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (searchQuery.trim()) {
+      router.push(`/discover?search=${encodeURIComponent(searchQuery.trim())}`)
+      setShowMobileSearch(false)
     }
   }
 
@@ -35,85 +36,88 @@ export function SimpleNavbar() {
           </span>
         </Link>
 
-        <div className="hidden md:flex items-center space-x-1">
+        <div className="hidden lg:flex items-center space-x-4 flex-1 max-w-2xl mx-8">
+          <div className="hidden md:flex items-center space-x-1">
+            <Link href="/">
+              <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
+                Home
+              </Button>
+            </Link>
+
+            <Link href="/create">
+              <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
+                Create
+              </Button>
+            </Link>
+
+            <Link href="/dashboard">
+              <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
+                Dashboard
+              </Button>
+            </Link>
+          </div>
+
+          <form onSubmit={handleSearch} className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search campaigns..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 bg-gray-900/50 border-gray-800 text-white placeholder:text-gray-500 focus:border-primary focus:ring-1 focus:ring-primary"
+              />
+            </div>
+          </form>
+        </div>
+
+        <div className="flex lg:hidden items-center space-x-1">
           <Link href="/">
             <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
               Home
             </Button>
           </Link>
 
-          <Link href="/create">
+          <Link href="/dashboard">
             <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
-              Create
+              Dashboard
             </Button>
           </Link>
-
-          {isConnected && (
-            <Link href="/dashboard">
-              <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
-                Dashboard
-              </Button>
-            </Link>
-          )}
         </div>
 
         <div className="flex items-center space-x-3">
-          {!isConnected ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary"
-                  disabled={isConnecting}
-                >
-                  {isConnecting ? "Connecting..." : "Get Involved"}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
-                {connectors.map((connector) => (
-                  <DropdownMenuItem
-                    key={connector.id}
-                    onClick={() => handleConnect(connector)}
-                    className="text-white hover:bg-gray-800 cursor-pointer"
-                  >
-                    Connect with {connector.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90 text-black font-bold">
-                  {address?.slice(0, 6)}...{address?.slice(-4)}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="bg-gray-900 border-gray-800">
-                <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="cursor-pointer">
-                    Dashboard
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/create" className="cursor-pointer">
-                    Create Campaign
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href="/test" className="cursor-pointer">
-                    Get Test USDC
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => disconnect()}
-                  className="text-red-400 hover:bg-gray-800 cursor-pointer"
-                >
-                  Disconnect
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="lg:hidden text-gray-300 hover:text-white hover:bg-gray-900"
+            onClick={() => setShowMobileSearch(!showMobileSearch)}
+          >
+            {showMobileSearch ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+          </Button>
+
+          <WalletButton />
         </div>
       </div>
+
+      {showMobileSearch && (
+        <div className="lg:hidden border-t border-primary/20 bg-black/90 backdrop-blur-nav">
+          <div className="container py-3">
+            <form onSubmit={handleSearch}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search campaigns..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-10 pr-4 bg-gray-900/50 border-gray-800 text-white placeholder:text-gray-500 focus:border-primary focus:ring-1 focus:ring-primary"
+                  autoFocus
+                />
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </nav>
   )
 }

@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Inter, Space_Grotesk } from "next/font/google"
 import "./globals.css"
 import { Providers } from "@/components/providers"
-import { SimpleNavbar } from "@/components/simple-navbar"
+import { Navbar } from "@/components/navbar"
 import { SiteFooter } from "@/components/site-footer"
 
 const inter = Inter({
@@ -34,7 +34,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`font-sans ${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         <Providers>
-          <SimpleNavbar />
+          <Navbar />
           {children}
           <SiteFooter />
         </Providers>

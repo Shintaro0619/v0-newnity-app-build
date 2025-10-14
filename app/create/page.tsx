@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useCallback } from "react"
+import { useAccount } from "wagmi"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,9 +12,16 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { RichEditor } from "@/components/ui/rich-editor"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format, addDays } from "date-fns"
 import Link from "next/link"
-import { useCampaignContract } from "@/lib/hooks/use-campaign-contract"
-import { useAccount } from "wagmi"
+import dynamic from "next/dynamic"
+
+const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
+  ssr: false,
+  loading: () => <Button disabled>Loading...</Button>,
+})
 
 import { MediaUpload } from "@/components/ui/media-upload"
 
@@ -32,7 +40,7 @@ interface CampaignData {
   }
   funding: {
     goal: number
-    duration: number
+    endDate: Date | undefined
     currency: string
     minPledge: number
   }
@@ -49,7 +57,7 @@ interface RewardTier {
   title: string
   description: string
   amount: number
-  deliveryDate: string
+  deliveryDate: Date | undefined
   quantity: number | null
   isLimited: boolean
   items: string[]
@@ -70,7 +78,7 @@ const initialCampaignData: CampaignData = {
   },
   funding: {
     goal: 0,
-    duration: 30,
+    endDate: undefined,
     currency: "USD",
     minPledge: 1,
   },
@@ -97,10 +105,13 @@ const categories = [
 ]
 
 export default function CreateCampaignPage() {
+  const { address, isConnected } = useAccount()
+
   const [currentStep, setCurrentStep] = useState(1)
   const [campaignData, setCampaignData] = useState<CampaignData>(initialCampaignData)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -117,6 +128,7 @@ export default function CreateCampaignPage() {
     const [localTitle, setLocalTitle] = useState(tier.title)
     const [localAmount, setLocalAmount] = useState(tier.amount)
     const [localDescription, setLocalDescription] = useState(tier.description)
+    const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
 
     const handleTitleBlur = () => {
       if (localTitle !== tier.title) {
@@ -185,11 +197,28 @@ export default function CreateCampaignPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Delivery</Label>
-              <Input
-                type="date"
-                value={tier.deliveryDate}
-                onChange={(e) => onUpdate({ ...tier, deliveryDate: e.target.value })}
-              />
+              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-left font-normal bg-transparent">
+                    <span className="mr-2">📅</span>
+                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={tier.deliveryDate}
+                    onSelect={(date) => {
+                      onUpdate({ ...tier, deliveryDate: date })
+                      if (date) {
+                        setIsDeliveryDateOpen(false)
+                      }
+                    }}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <div className="flex items-center space-x-2">
@@ -220,7 +249,7 @@ export default function CreateCampaignPage() {
       title: "",
       description: "",
       amount: 0,
-      deliveryDate: "",
+      deliveryDate: undefined,
       quantity: null,
       isLimited: false,
       items: [],
@@ -263,8 +292,8 @@ export default function CreateCampaignPage() {
       if (!campaignData.funding.goal || campaignData.funding.goal <= 0) {
         newErrors.goal = "Funding goal must be greater than 0"
       }
-      if (!campaignData.funding.duration || campaignData.funding.duration <= 0) {
-        newErrors.duration = "Campaign duration must be greater than 0"
+      if (!campaignData.funding.endDate) {
+        newErrors.endDate = "Campaign end date is required"
       }
     }
 
@@ -278,13 +307,11 @@ export default function CreateCampaignPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const { address, isConnected } = useAccount()
-  const { handleCreateCampaign, isCreatePending, isCreateLoading } = useCampaignContract()
-
   const handleSubmit = async () => {
     if (!validateStep(4)) return
-    if (!isConnected) {
-      setErrors({ wallet: "Please connect your wallet first" })
+
+    if (!isConnected || !address) {
+      setErrors({ wallet: "Please connect your wallet to create the campaign" })
       return
     }
 
@@ -292,12 +319,22 @@ export default function CreateCampaignPage() {
     try {
       const formData = new FormData()
 
+      const duration = campaignData.funding.endDate
+        ? Math.ceil((campaignData.funding.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+        : 30
+
       formData.append(
         "data",
         JSON.stringify({
           basic: campaignData.basic,
-          funding: campaignData.funding,
-          rewards: campaignData.rewards,
+          funding: {
+            ...campaignData.funding,
+            duration, // Send calculated duration to backend
+          },
+          rewards: campaignData.rewards.map((reward) => ({
+            ...reward,
+            deliveryDate: reward.deliveryDate ? reward.deliveryDate.toISOString() : "",
+          })),
           creatorAddress: address,
         }),
       )
@@ -580,13 +617,14 @@ export default function CreateCampaignPage() {
                         <Input
                           id="goal"
                           type="number"
-                          value={campaignData.funding.goal}
-                          onChange={(e) =>
+                          value={campaignData.funding.goal === 0 ? "" : campaignData.funding.goal}
+                          onChange={(e) => {
+                            const value = e.target.value === "" ? 0 : Number(e.target.value)
                             setCampaignData((prev) => ({
                               ...prev,
-                              funding: { ...prev.funding, goal: Number(e.target.value) },
+                              funding: { ...prev.funding, goal: value },
                             }))
-                          }
+                          }}
                           placeholder="50000"
                           className={`pl-10 ${errors.goal ? "border-destructive" : ""}`}
                         />
@@ -596,28 +634,42 @@ export default function CreateCampaignPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="duration">Campaign Duration (days) *</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                          📅
-                        </span>
-                        <Input
-                          id="duration"
-                          type="number"
-                          value={campaignData.funding.duration}
-                          onChange={(e) =>
-                            setCampaignData((prev) => ({
-                              ...prev,
-                              funding: { ...prev.funding, duration: Number(e.target.value) },
-                            }))
-                          }
-                          placeholder="30"
-                          className={`pl-10 ${errors.duration ? "border-destructive" : ""}`}
-                        />
-                      </div>
-                      {errors.duration && <p className="text-sm text-destructive">{errors.duration}</p>}
+                      <Label htmlFor="endDate">Campaign End Date *</Label>
+                      <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            className={`w-full justify-start text-left font-normal ${errors.endDate ? "border-destructive" : ""}`}
+                          >
+                            <span className="mr-2">📅</span>
+                            {campaignData.funding.endDate ? (
+                              format(campaignData.funding.endDate, "PPP")
+                            ) : (
+                              <span className="text-muted-foreground">Pick an end date</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            selected={campaignData.funding.endDate}
+                            onSelect={(date) => {
+                              setCampaignData((prev) => ({
+                                ...prev,
+                                funding: { ...prev.funding, endDate: date },
+                              }))
+                              if (date) {
+                                setIsEndDateOpen(false)
+                              }
+                            }}
+                            disabled={(date) => date < addDays(new Date(), 1)}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      {errors.endDate && <p className="text-sm text-destructive">{errors.endDate}</p>}
                       <p className="text-xs text-muted-foreground">
-                        Campaign will end at 23:59:59 UTC on the final day. Most successful campaigns run for 30-60
+                        Campaign will end at 23:59:59 UTC on the selected day. Most successful campaigns run for 30-60
                         days.
                       </p>
                     </div>
@@ -631,13 +683,14 @@ export default function CreateCampaignPage() {
                         <Input
                           id="minPledge"
                           type="number"
-                          value={campaignData.funding.minPledge}
-                          onChange={(e) =>
+                          value={campaignData.funding.minPledge === 0 ? "" : campaignData.funding.minPledge}
+                          onChange={(e) => {
+                            const value = e.target.value === "" ? 1 : Number(e.target.value)
                             setCampaignData((prev) => ({
                               ...prev,
-                              funding: { ...prev.funding, minPledge: Number(e.target.value) },
+                              funding: { ...prev.funding, minPledge: value },
                             }))
-                          }
+                          }}
                           placeholder="1"
                           className="pl-10"
                         />
@@ -691,6 +744,49 @@ export default function CreateCampaignPage() {
                       Add Tier
                     </Button>
                   </div>
+
+                  {!isConnected && (
+                    <Alert>
+                      <span className="text-lg">👛</span>
+                      <AlertDescription>
+                        <div className="space-y-3">
+                          <p>
+                            <strong>Wallet Connection Required</strong>
+                          </p>
+                          <p className="text-sm">
+                            To create your campaign, you'll need to connect your wallet. This allows you to deploy your
+                            campaign to the blockchain and receive funds.
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            Please use the "Connect Wallet" button in the header to connect your wallet.
+                          </p>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {isConnected && address && (
+                    <Alert>
+                      <span className="text-lg">✅</span>
+                      <AlertDescription>
+                        <div className="space-y-2">
+                          <p>
+                            <strong>Wallet Connected</strong>
+                          </p>
+                          <p className="text-sm font-mono">
+                            {address.slice(0, 6)}...{address.slice(-4)}
+                          </p>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {errors.wallet && (
+                    <Alert>
+                      <span className="text-lg">⚠️</span>
+                      <AlertDescription>{errors.wallet}</AlertDescription>
+                    </Alert>
+                  )}
 
                   {errors.rewards && (
                     <Alert>
@@ -778,8 +874,8 @@ export default function CreateCampaignPage() {
                   <span className="ml-2">→</span>
                 </Button>
               ) : (
-                <Button onClick={handleSubmit} disabled={loading || isCreatePending || isCreateLoading}>
-                  {loading || isCreatePending || isCreateLoading ? "Creating Campaign..." : "Create Campaign"}
+                <Button onClick={handleSubmit} disabled={loading || !isConnected}>
+                  {loading ? "Creating Campaign..." : "Create Campaign"}
                 </Button>
               )}
             </div>

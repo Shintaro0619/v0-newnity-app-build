@@ -3,14 +3,9 @@ import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { Clock } from "lucide-react"
-import { useReadContract } from "wagmi"
-import { CAMPAIGN_ESCROW_ABI } from "@/lib/contracts/campaign-escrow-abi"
-import { CAMPAIGN_ESCROW_ADDRESS } from "@/lib/contracts/contract-addresses"
-import { formatUnits } from "viem"
 
 interface CampaignCardProps {
-  id: string // Changed from number to string to match database ID type
+  id: string
   title: string
   creator: string
   image: string
@@ -20,7 +15,7 @@ interface CampaignCardProps {
   category: string
   daysLeft?: number
   status?: "live" | "upcoming" | "funded"
-  blockchainCampaignId?: number // Renamed from onChainId for clarity
+  blockchainCampaignId?: number
 }
 
 export function CampaignCard({
@@ -34,27 +29,10 @@ export function CampaignCard({
   category,
   daysLeft: initialDaysLeft,
   status = "live",
-  blockchainCampaignId,
 }: CampaignCardProps) {
-  const { data: campaignData } = useReadContract({
-    address: CAMPAIGN_ESCROW_ADDRESS,
-    abi: CAMPAIGN_ESCROW_ABI,
-    functionName: "getCampaign",
-    args: blockchainCampaignId !== undefined ? [BigInt(blockchainCampaignId)] : undefined,
-    query: {
-      enabled: blockchainCampaignId !== undefined, // Only fetch if blockchain ID exists
-      refetchInterval: 10000,
-    },
-  })
-
-  const raised =
-    campaignData && campaignData[1] !== undefined ? Number(formatUnits(campaignData[1], 6)) : initialRaised || 0
-  const goal =
-    campaignData && campaignData[2] !== undefined ? Number(formatUnits(campaignData[2], 6)) : initialGoal || 100000
-  const daysLeft =
-    campaignData && campaignData[3] !== undefined
-      ? Math.max(0, Math.floor((Number(campaignData[3]) - Date.now() / 1000) / 86400))
-      : initialDaysLeft || 0
+  const raised = initialRaised || 0
+  const goal = initialGoal || 100000
+  const daysLeft = initialDaysLeft || 0
 
   const progress = goal > 0 ? (raised / goal) * 100 : 0
 
@@ -69,7 +47,7 @@ export function CampaignCard({
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
           <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1">
-            <Clock className="w-3 h-3 text-white" />
+            <span className="text-xs">⏰</span>
             <span className="text-xs font-medium text-white">{daysLeft} days left</span>
           </div>
           {status === "upcoming" && (
@@ -97,11 +75,11 @@ export function CampaignCard({
             <Progress value={progress} className="h-1.5 bg-gray-800" />
             <div className="flex items-center gap-3 text-xs text-gray-400">
               <span className="flex items-center gap-1">
-                <Users className="w-3 h-3" />
+                <span>👥</span>
                 {initialBackers || 0} backers
               </span>
               <span className="flex items-center gap-1">
-                <Clock className="w-3 h-3" />
+                <span>⏰</span>
                 {daysLeft} days left
               </span>
             </div>
@@ -109,25 +87,5 @@ export function CampaignCard({
         </CardContent>
       </Card>
     </Link>
-  )
-}
-
-function Users({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
   )
 }

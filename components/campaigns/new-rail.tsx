@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { CampaignCard } from "./campaign-card"
+import { getCampaigns } from "@/lib/actions/campaigns"
 
 interface Campaign {
-  id: number
+  id: string
   title: string
   creator: string
   image: string
@@ -14,6 +15,7 @@ interface Campaign {
   category: string
   daysLeft: number
   status: "live" | "upcoming" | "funded"
+  blockchainCampaignId?: number
 }
 
 export function NewRail() {
@@ -21,82 +23,39 @@ export function NewRail() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const mockCampaigns: Campaign[] = [
-      {
-        id: 101,
-        title: "Indie RPG: Chronicles of the Lost Kingdom",
-        creator: "Moonlight Games",
-        image: "/fantasy-rpg-game-medieval-castle.jpg",
-        raised: 45200,
-        goal: 100000,
-        backers: 312,
-        category: "Game",
-        daysLeft: 25,
-        status: "live",
-      },
-      {
-        id: 102,
-        title: "Digital Art Collection: Neon Dreams",
-        creator: "CryptoArtist",
-        image: "/neon-digital-art-cyberpunk-abstract.jpg",
-        raised: 28900,
-        goal: 50000,
-        backers: 187,
-        category: "Digital",
-        daysLeft: 18,
-        status: "live",
-      },
-      {
-        id: 103,
-        title: "Smart Home IoT Hub",
-        creator: "TechNova",
-        image: "/smart-home-device-modern-technology.jpg",
-        raised: 67800,
-        goal: 80000,
-        backers: 445,
-        category: "Tech",
-        daysLeft: 22,
-        status: "live",
-      },
-      {
-        id: 104,
-        title: "Anime Music Video Project",
-        creator: "Studio Harmony",
-        image: "/anime-music-studio-recording.jpg",
-        raised: 34500,
-        goal: 60000,
-        backers: 256,
-        category: "Music",
-        daysLeft: 20,
-        status: "live",
-      },
-      {
-        id: 105,
-        title: "VTuber Debut Support Project",
-        creator: "Virtual Stars Agency",
-        image: "/vtuber-avatar-streaming-setup.jpg",
-        raised: 52100,
-        goal: 75000,
-        backers: 389,
-        category: "Social",
-        daysLeft: 14,
-        status: "live",
-      },
-      {
-        id: 106,
-        title: "Blockchain Gaming Platform",
-        creator: "Web3 Gaming DAO",
-        image: "/blockchain-gaming-cryptocurrency-nft.jpg",
-        raised: 89400,
-        goal: 120000,
-        backers: 567,
-        category: "Web3",
-        daysLeft: 16,
-        status: "live",
-      },
-    ]
-    setCampaigns(mockCampaigns)
-    setLoading(false)
+    const loadCampaigns = async () => {
+      try {
+        const data = await getCampaigns({
+          status: "ACTIVE",
+          limit: 6,
+          sortBy: "created_at",
+          sortOrder: "desc",
+        })
+
+        const transformed = data.map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          creator: c.creator_name || "Anonymous",
+          image: c.cover_image || "/placeholder.svg?height=400&width=600",
+          raised: c.raised_amount || 0,
+          goal: c.goal_amount,
+          backers: Number.parseInt(c.backers_count) || 0,
+          category: c.category,
+          daysLeft: Math.max(0, Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
+          status: "live" as const,
+          blockchainCampaignId: c.blockchain_campaign_id,
+        }))
+
+        setCampaigns(transformed)
+      } catch (error) {
+        console.error("[v0] Failed to load new campaigns:", error)
+        setCampaigns([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadCampaigns()
   }, [])
 
   if (loading) {
@@ -112,6 +71,10 @@ export function NewRail() {
         </div>
       </section>
     )
+  }
+
+  if (campaigns.length === 0) {
+    return null
   }
 
   return (

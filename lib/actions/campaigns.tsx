@@ -78,42 +78,170 @@ export async function getCampaigns(filters?: {
   offset?: number
 }) {
   try {
-    // Build WHERE conditions
-    const conditions: string[] = ["1=1"]
+    console.log("[v0] getCampaigns called with filters:", filters)
 
-    if (filters?.category && filters.category !== "all") {
-      conditions.push(`c.category = '${filters.category}'`)
+    const limit = filters?.limit || 12
+    const offset = filters?.offset || 0
+    const searchPattern = filters?.search ? `%${filters.search}%` : null
+
+    if (searchPattern) {
+      console.log("[v0] Search pattern:", searchPattern)
+
+      // Query to see what campaigns exist
+      const allCampaigns = await sql`
+        SELECT id, title, description, category, status
+        FROM campaigns
+        LIMIT 5
+      `
+      console.log("[v0] Sample campaigns in database:", JSON.stringify(allCampaigns, null, 2))
     }
 
-    if (filters?.status) {
-      conditions.push(`c.status = '${filters.status}'`)
+    let campaigns
+
+    // Build query based on filter combinations
+    if (filters?.category && filters.category !== "all" && filters?.status && searchPattern) {
+      // Category + Status + Search
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.category = ${filters.category}
+          AND c.status = ${filters.status}
+          AND (c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern})
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (filters?.category && filters.category !== "all" && filters?.status) {
+      // Category + Status
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.category = ${filters.category}
+          AND c.status = ${filters.status}
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (filters?.category && filters.category !== "all" && searchPattern) {
+      // Category + Search
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.category = ${filters.category}
+          AND (c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern})
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (filters?.status && searchPattern) {
+      // Status + Search
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.status = ${filters.status}
+          AND (c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern})
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (filters?.category && filters.category !== "all") {
+      // Category only
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.category = ${filters.category}
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (filters?.status) {
+      // Status only
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.status = ${filters.status}
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else if (searchPattern) {
+      // Search only
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        WHERE c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern}
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
+    } else {
+      // No filters
+      campaigns = await sql`
+        SELECT 
+          c.*,
+          u.name as creator_name,
+          u.avatar as creator_avatar,
+          COUNT(DISTINCT p.id) as backers_count
+        FROM campaigns c
+        LEFT JOIN users u ON c.creator_id = u.id
+        LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
+        GROUP BY c.id, u.name, u.avatar 
+        ORDER BY c.created_at DESC
+        LIMIT ${limit}
+        OFFSET ${offset}
+      `
     }
 
-    if (filters?.search) {
-      const searchTerm = filters.search.replace(/'/g, "''") // Escape single quotes
-      conditions.push(`(c.title ILIKE '%${searchTerm}%' OR c.description ILIKE '%${searchTerm}%')`)
-    }
-
-    const whereClause = conditions.join(" AND ")
-    const limitClause = filters?.limit ? `LIMIT ${filters.limit}` : ""
-    const offsetClause = filters?.offset ? `OFFSET ${filters.offset}` : ""
-
-    // Use tagged template literal
-    const campaigns = await sql`
-      SELECT 
-        c.*,
-        u.name as creator_name,
-        u.avatar as creator_avatar,
-        COUNT(DISTINCT p.id) as backers_count
-      FROM campaigns c
-      LEFT JOIN users u ON c.creator_id = u.id
-      LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
-      WHERE ${sql.unsafe(whereClause)}
-      GROUP BY c.id, u.name, u.avatar 
-      ORDER BY c.created_at DESC
-      ${sql.unsafe(limitClause)}
-      ${sql.unsafe(offsetClause)}
-    `
+    console.log("[v0] Found campaigns:", campaigns.length)
 
     return campaigns.map((campaign) => ({
       ...campaign,

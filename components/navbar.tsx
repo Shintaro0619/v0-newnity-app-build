@@ -1,16 +1,25 @@
 "use client"
 
 import type React from "react"
-
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
-import { WalletConnectButton } from "@/components/wallet-connect-button"
-import { AuthButton } from "@/components/auth-button"
 import { Input } from "@/components/ui/input"
-import { Search, X } from "lucide-react"
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import dynamic from "next/dynamic"
+
+const WalletConnectButton = dynamic(
+  () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
+  {
+    ssr: false,
+    loading: () => (
+      <Button variant="outline" size="sm" disabled>
+        Loading...
+      </Button>
+    ),
+  },
+)
 
 export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -59,7 +68,7 @@ export function Navbar() {
 
           <form onSubmit={handleSearch} className="flex-1 max-w-md">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
               <Input
                 type="text"
                 placeholder="Search campaigns..."
@@ -92,11 +101,10 @@ export function Navbar() {
             className="lg:hidden text-gray-300 hover:text-white hover:bg-gray-900"
             onClick={() => setShowMobileSearch(!showMobileSearch)}
           >
-            {showMobileSearch ? <X className="w-5 h-5" /> : <Search className="w-5 h-5" />}
+            {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
           <WalletConnectButton />
-          <AuthButton />
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>
@@ -109,7 +117,7 @@ export function Navbar() {
           <div className="container py-3">
             <form onSubmit={handleSearch}>
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
                 <Input
                   type="text"
                   placeholder="Search campaigns..."
