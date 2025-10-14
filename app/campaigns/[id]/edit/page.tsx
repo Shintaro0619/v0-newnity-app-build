@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
-import { useUser } from "@stackframe/stack"
+import { useAccount } from "wagmi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -83,7 +83,7 @@ interface Milestone {
 export default function EditCampaignPage() {
   const params = useParams()
   const router = useRouter()
-  const user = useUser()
+  const { address, isConnected } = useAccount()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -245,18 +245,16 @@ export default function EditCampaignPage() {
     })
   }
 
-  if (!user) {
+  if (!isConnected) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <CardTitle>Access Denied</CardTitle>
-            <CardDescription>Please sign in to edit campaigns</CardDescription>
+            <CardDescription>Please connect your wallet to edit campaigns</CardDescription>
           </CardHeader>
           <CardContent className="text-center">
-            <Button asChild>
-              <Link href="/handler/signin">Sign In</Link>
-            </Button>
+            <Button onClick={() => (window.location.href = "/")}>Go Home</Button>
           </CardContent>
         </Card>
       </div>

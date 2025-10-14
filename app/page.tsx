@@ -3,6 +3,8 @@ import { NewRail } from "@/components/campaigns/new-rail"
 import { TrendingRail } from "@/components/campaigns/trending-rail"
 import { CategoryRail } from "@/components/campaigns/category-rail"
 import { CampaignSidebar } from "@/components/campaigns/campaign-sidebar"
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import type { Metadata } from "next"
 
 export const metadata: Metadata = {
@@ -27,9 +29,19 @@ export default function HomePage() {
 
             {/* Main content */}
             <div className="flex-1 min-w-0">
-              <div className="mb-8">
-                <h1 className="text-4xl font-bold text-white mb-2">Campaigns</h1>
-                <p className="text-gray-400">Discover and support innovative projects on newnity</p>
+              <div className="mb-8 flex items-center justify-between">
+                <div>
+                  <h1 className="text-4xl font-bold text-white mb-2">Campaigns</h1>
+                  <p className="text-gray-400">Discover and support innovative projects on newnity</p>
+                </div>
+                <Link href="/discover">
+                  <Button
+                    variant="outline"
+                    className="border-primary/40 text-primary hover:bg-primary/10 bg-transparent"
+                  >
+                    View All
+                  </Button>
+                </Link>
               </div>
 
               <FeaturedRail />
