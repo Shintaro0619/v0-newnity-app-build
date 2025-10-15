@@ -16,6 +16,8 @@ import { Loader2, Upload, User, Globe, FileText } from "lucide-react"
 import Link from "next/link"
 import { put } from "@vercel/blob"
 
+export const dynamic = "force-dynamic"
+
 export default function ProfileSettingsPage() {
   const user = useUser()
   const { address } = useAccount()

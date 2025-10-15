@@ -49,6 +49,8 @@ function getStatusBadgeVariant(status: string): "default" | "secondary" | "destr
   }
 }
 
+export const dynamic = "force-dynamic"
+
 export default async function ProfilePage({ params }: PageProps) {
   const { address } = await params
   const [userProfile, campaigns] = await Promise.all([getUserProfile(address), getCampaignsByCreator(address)])
