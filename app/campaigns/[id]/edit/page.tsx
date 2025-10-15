@@ -90,69 +90,49 @@ export default function EditCampaignPage() {
   const [activeTab, setActiveTab] = useState("basic")
 
   useEffect(() => {
-    // Mock campaign data - in real app, fetch from API
-    const mockCampaign: Campaign = {
-      id: params.id as string,
-      title: "Revolutionary VR Game: Neon Worlds",
-      description: "Experience the future of gaming with our immersive VR adventure set in a cyberpunk universe.",
-      story: "<h2>The Vision</h2><p>Neon Worlds represents the next evolution in VR gaming...</p>",
-      goalAmount: 50000,
-      raisedAmount: 32500,
-      currency: "USDC",
-      duration: 30,
-      category: "Gaming",
-      tags: ["VR", "Gaming", "Cyberpunk", "Indie"],
-      status: "ACTIVE",
-      coverImage: "/cyberpunk-vr-game.jpg",
-      gallery: ["/game-screenshot-1.jpg", "/game-screenshot-2.jpg"],
-      videoUrl: "https://youtube.com/watch?v=example",
-      startDate: "2024-01-01",
-      endDate: "2024-01-31",
-      createdAt: "2024-01-01",
-      updatedAt: "2024-01-15",
-      tiers: [
-        {
-          id: "1",
-          title: "Early Bird",
-          description: "Get the game at a discounted price",
-          amount: 25,
-          isLimited: true,
-          maxBackers: 100,
-          rewards: ["Digital copy of the game", "Early access beta", "Digital soundtrack"],
-          estimatedDelivery: "2024-06-01",
-        },
-        {
-          id: "2",
-          title: "Supporter",
-          description: "Support the development and get exclusive content",
-          amount: 50,
-          isLimited: false,
-          rewards: ["Everything from Early Bird", "Exclusive in-game skin", "Behind-the-scenes videos"],
-          estimatedDelivery: "2024-06-01",
-        },
-      ],
-      milestones: [
-        {
-          id: "1",
-          title: "Core Gameplay",
-          description: "Complete basic VR mechanics and movement system",
-          targetDate: "2024-02-15",
-          status: "COMPLETED",
-        },
-        {
-          id: "2",
-          title: "World Building",
-          description: "Create 3 main cyberpunk environments",
-          targetDate: "2024-03-15",
-          status: "IN_PROGRESS",
-        },
-      ],
+    const fetchCampaign = async () => {
+      try {
+        const response = await fetch(`/api/campaigns/${params.id}`)
+        if (!response.ok) {
+          throw new Error("Failed to fetch campaign")
+        }
+        const data = await response.json()
+
+        // Transform API data to match Campaign interface
+        const transformedCampaign: Campaign = {
+          id: data.id,
+          title: data.title,
+          description: data.description,
+          story: data.story || "",
+          goalAmount: Number(data.goal_amount),
+          raisedAmount: Number(data.raised_amount),
+          currency: data.currency,
+          duration: data.duration,
+          category: data.category,
+          tags: data.tags || [],
+          status: data.status,
+          coverImage: data.cover_image,
+          gallery: data.gallery || [],
+          videoUrl: data.video_url,
+          startDate: data.start_date,
+          endDate: data.end_date,
+          createdAt: data.created_at,
+          updatedAt: data.updated_at,
+          tiers: data.tiers || [],
+          milestones: data.milestones || [],
+        }
+
+        setCampaign(transformedCampaign)
+      } catch (error) {
+        console.error("Error fetching campaign:", error)
+      } finally {
+        setLoading(false)
+      }
     }
 
-    setTimeout(() => {
-      setCampaign(mockCampaign)
-      setLoading(false)
-    }, 1000)
+    if (params.id) {
+      fetchCampaign()
+    }
   }, [params.id])
 
   const handleSave = async () => {
@@ -160,11 +140,34 @@ export default function EditCampaignPage() {
 
     setSaving(true)
     try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+      const response = await fetch(`/api/campaigns/${campaign.id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          title: campaign.title,
+          description: campaign.description,
+          story: campaign.story,
+          goal_amount: campaign.goalAmount,
+          currency: campaign.currency,
+          duration: campaign.duration,
+          category: campaign.category,
+          tags: campaign.tags,
+          status: campaign.status,
+          cover_image: campaign.coverImage,
+          gallery: campaign.gallery,
+          video_url: campaign.videoUrl,
+          start_date: campaign.startDate,
+          end_date: campaign.endDate,
+          tiers: campaign.tiers,
+          milestones: campaign.milestones,
+        }),
+      })
 
-      // In real app, make PUT request to /api/campaigns/[id]
-      console.log("Saving campaign:", campaign)
+      if (!response.ok) {
+        throw new Error("Failed to save campaign")
+      }
 
       // Show success message or redirect
       router.push(`/campaigns/${campaign.id}`)

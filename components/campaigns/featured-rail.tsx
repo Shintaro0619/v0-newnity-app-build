@@ -5,7 +5,7 @@ import { CampaignCard } from "./campaign-card"
 import { getCampaigns } from "@/lib/actions/campaigns"
 
 interface Campaign {
-  id: string // Changed from number to string to match database ID type
+  id: string
   title: string
   creator: string
   image: string
@@ -15,7 +15,7 @@ interface Campaign {
   category: string
   daysLeft: number
   status: "live" | "upcoming" | "funded"
-  blockchainCampaignId?: number // Added blockchain campaign ID
+  blockchainCampaignId?: number
 }
 
 export function FeaturedRail() {
@@ -28,7 +28,7 @@ export function FeaturedRail() {
         const data = await getCampaigns({ status: "ACTIVE", limit: 3 })
 
         const transformed = data.map((c: any) => ({
-          id: c.id, // Use database ID (string)
+          id: c.id,
           title: c.title,
           creator: c.creator_name || "Anonymous",
           image: c.cover_image || "/placeholder.svg?height=400&width=600",
@@ -38,7 +38,7 @@ export function FeaturedRail() {
           category: c.category,
           daysLeft: Math.max(0, Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
           status: "live" as const,
-          blockchainCampaignId: c.blockchain_campaign_id, // Pass blockchain ID if it exists
+          blockchainCampaignId: c.blockchain_campaign_id,
         }))
 
         setCampaigns(transformed)

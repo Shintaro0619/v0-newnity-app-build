@@ -76,6 +76,8 @@ export async function getCampaigns(filters?: {
   search?: string
   limit?: number
   offset?: number
+  sortBy?: string
+  sortOrder?: string
 }) {
   try {
     console.log("[v0] getCampaigns called with filters:", filters)
@@ -101,6 +103,8 @@ export async function getCampaigns(filters?: {
     // Build query based on filter combinations
     if (filters?.category && filters.category !== "all" && filters?.status && searchPattern) {
       // Category + Status + Search
+      const statusCondition = filters.status === "ACTIVE" ? sql`c.status = 'ACTIVE'` : sql`c.status = ${filters.status}`
+
       campaigns = await sql`
         SELECT 
           c.*,
@@ -111,7 +115,7 @@ export async function getCampaigns(filters?: {
         LEFT JOIN users u ON c.creator_id = u.id
         LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
         WHERE c.category = ${filters.category}
-          AND c.status = ${filters.status}
+          AND ${statusCondition}
           AND (c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern})
         GROUP BY c.id, u.name, u.avatar 
         ORDER BY c.created_at DESC
@@ -120,6 +124,8 @@ export async function getCampaigns(filters?: {
       `
     } else if (filters?.category && filters.category !== "all" && filters?.status) {
       // Category + Status
+      const statusCondition = filters.status === "ACTIVE" ? sql`c.status = 'ACTIVE'` : sql`c.status = ${filters.status}`
+
       campaigns = await sql`
         SELECT 
           c.*,
@@ -130,7 +136,7 @@ export async function getCampaigns(filters?: {
         LEFT JOIN users u ON c.creator_id = u.id
         LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
         WHERE c.category = ${filters.category}
-          AND c.status = ${filters.status}
+          AND ${statusCondition}
         GROUP BY c.id, u.name, u.avatar 
         ORDER BY c.created_at DESC
         LIMIT ${limit}
@@ -156,6 +162,8 @@ export async function getCampaigns(filters?: {
       `
     } else if (filters?.status && searchPattern) {
       // Status + Search
+      const statusCondition = filters.status === "ACTIVE" ? sql`c.status = 'ACTIVE'` : sql`c.status = ${filters.status}`
+
       campaigns = await sql`
         SELECT 
           c.*,
@@ -165,7 +173,7 @@ export async function getCampaigns(filters?: {
         FROM campaigns c
         LEFT JOIN users u ON c.creator_id = u.id
         LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
-        WHERE c.status = ${filters.status}
+        WHERE ${statusCondition}
           AND (c.title ILIKE ${searchPattern} OR c.description ILIKE ${searchPattern} OR c.category ILIKE ${searchPattern})
         GROUP BY c.id, u.name, u.avatar 
         ORDER BY c.created_at DESC
@@ -191,6 +199,8 @@ export async function getCampaigns(filters?: {
       `
     } else if (filters?.status) {
       // Status only
+      const statusCondition = filters.status === "ACTIVE" ? sql`c.status = 'ACTIVE'` : sql`c.status = ${filters.status}`
+
       campaigns = await sql`
         SELECT 
           c.*,
@@ -200,7 +210,7 @@ export async function getCampaigns(filters?: {
         FROM campaigns c
         LEFT JOIN users u ON c.creator_id = u.id
         LEFT JOIN pledges p ON c.id = p.campaign_id AND p.status = 'CONFIRMED'
-        WHERE c.status = ${filters.status}
+        WHERE ${statusCondition}
         GROUP BY c.id, u.name, u.avatar 
         ORDER BY c.created_at DESC
         LIMIT ${limit}
@@ -646,6 +656,15 @@ export async function saveRefundToDatabase(data: {
       WHERE campaign_id = ${data.campaignId}
         AND backer_id = ${backerId}
         AND status = 'CONFIRMED'
+    `
+
+    await sql`
+      UPDATE campaigns
+      SET 
+        status = 'FAILED',
+        updated_at = NOW()
+      WHERE id = ${data.campaignId}
+        AND status != 'FUNDED'
     `
 
     console.log("[v0] Refund saved to database successfully")

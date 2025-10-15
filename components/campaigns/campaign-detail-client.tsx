@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
@@ -13,6 +13,7 @@ import { DeployCampaignButton } from "@/components/campaigns/deploy-campaign-but
 import { formatUnits } from "viem"
 import { getCampaignById, savePledgeToDatabase } from "@/lib/actions/campaigns"
 import { formatDeadline, isDeadlinePassed } from "@/lib/utils/date-utils"
+import { toast } from "react-toastify"
 
 interface CampaignDetailClientProps {
   campaign: any
@@ -29,6 +30,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   } | null>(null)
 
   const { address } = useAccount()
+  const router = useRouter()
 
   const creatorWalletAddress = campaign.creator?.walletAddress
 
@@ -64,6 +66,15 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     try {
+      console.log("[v0] Blockchain data loaded:", {
+        finalized: campaignData.finalized,
+        successful: campaignData.successful,
+        totalPledged: campaignData.totalPledged?.toString(),
+        goal: campaignData.goal?.toString(),
+        deadline: campaignData.deadline?.toString(),
+        creator: campaignData.creator,
+      })
+
       const raisedBigInt = campaignData.totalPledged
       const goalBigInt = campaignData.goal
       const deadlineBigInt = campaignData.deadline
@@ -82,12 +93,22 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
         backers: 0,
       })
 
-      setCampaign((prev: any) => ({
-        ...prev,
-        goal_amount: goal,
-        daysLeft,
-        status: campaignData.finalized ? (campaignData.successful ? "FUNDED" : "FAILED") : "ACTIVE",
-      }))
+      if (campaignData.finalized) {
+        const newStatus = campaignData.successful ? "FUNDED" : "FAILED"
+        setCampaign((prev: any) => ({
+          ...prev,
+          goal_amount: goal,
+          daysLeft,
+          status: newStatus,
+        }))
+      } else {
+        setCampaign((prev: any) => ({
+          ...prev,
+          goal_amount: goal,
+          daysLeft,
+          status: "ACTIVE",
+        }))
+      }
 
       blockchainDataLoaded.current = true
     } catch (error) {
@@ -96,27 +117,41 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   }, [campaignData, blockchainId])
 
   const handleFinalizeClick = async () => {
+    console.log("[v0] handleFinalizeClick called")
+    console.log("[v0] blockchainId:", blockchainId)
+
     if (!blockchainId) {
       console.error("[v0] No blockchain campaign ID")
       return
     }
 
+    console.log("[v0] Showing confirmation dialog")
     const confirmed = window.confirm(
       "Are you sure you want to finalize this campaign? This action cannot be undone. " +
         "If the campaign reached its goal, funds will be released to you. " +
         "If not, backers will be able to claim refunds.",
     )
 
+    console.log("[v0] Confirmation result:", confirmed)
     if (!confirmed) {
+      console.log("[v0] User cancelled finalization")
       return
     }
 
     try {
+      console.log("[v0] Calling handleFinalize with campaignId:", blockchainId)
       await handleFinalize(blockchainId)
+      console.log("[v0] handleFinalize completed, refreshing data")
       blockchainDataLoaded.current = false
       await refreshCampaignData()
+      console.log("[v0] Campaign data refreshed after finalization")
+      setTimeout(async () => {
+        blockchainDataLoaded.current = false
+        await refreshCampaignData()
+      }, 2000)
     } catch (error) {
       console.error("[v0] Failed to finalize campaign:", error)
+      toast.error(`Failed to finalize campaign: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
@@ -194,12 +229,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
 
   const isCreator = address && creatorWalletAddress && address.toLowerCase() === creatorWalletAddress.toLowerCase()
 
-  console.log("[v0] Creator check:", {
-    address,
-    creatorWalletAddress,
-    isCreator,
-    blockchainId,
-  })
+  const isBlockchainFinalized = campaignData?.finalized ?? false
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -211,13 +241,13 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 pt-20">
-        <Link
-          href="/campaigns"
+        <button
+          onClick={() => router.back()}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6"
         >
           <span>←</span>
           <span>Back to Campaigns</span>
-        </Link>
+        </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -325,14 +355,43 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                 </div>
 
                 {blockchainId ? (
-                  <Button
-                    className="w-full bg-primary hover:bg-primary/90 text-white glow-primary"
-                    onClick={handlePledgeClick}
-                    disabled={campaign.status !== "ACTIVE"}
-                  >
-                    <span className="mr-2">❤️</span>
-                    Back This Project
-                  </Button>
+                  <>
+                    {hasDeadlinePassed && !isBlockchainFinalized ? (
+                      <div className="space-y-2">
+                        <div className="p-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg text-sm">
+                          <p className="font-medium text-purple-900 dark:text-purple-100 mb-1">⏰ Campaign Ended</p>
+                          <p className="text-purple-800 dark:text-purple-200">
+                            The deadline has been reached.{" "}
+                            {isCreator
+                              ? "Finalize the campaign to determine if it was successful and release funds or enable refunds."
+                              : "Waiting for the creator to finalize the campaign."}
+                          </p>
+                        </div>
+                        <Button className="w-full bg-muted text-muted-foreground cursor-not-allowed" disabled>
+                          <span className="mr-2">❤️</span>
+                          Back This Project
+                        </Button>
+                        {isCreator && (
+                          <Button
+                            className="w-full bg-blue-600 hover:bg-blue-700"
+                            onClick={handleFinalizeClick}
+                            disabled={isFinalizePending}
+                          >
+                            {isFinalizePending ? "Finalizing..." : "Finalize Campaign"}
+                          </Button>
+                        )}
+                      </div>
+                    ) : (
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 text-white glow-primary"
+                        onClick={handlePledgeClick}
+                        disabled={campaign.status !== "ACTIVE" || hasDeadlinePassed}
+                      >
+                        <span className="mr-2">❤️</span>
+                        Back This Project
+                      </Button>
+                    )}
+                  </>
                 ) : isCreator ? (
                   <div className="space-y-4">
                     <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
@@ -357,52 +416,29 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   </div>
                 )}
 
-                {isCreator && blockchainId && (
-                  <>
-                    {hasDeadlinePassed && campaign.status === "ACTIVE" && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg text-sm">
-                          <p className="font-medium text-blue-900 dark:text-blue-100 mb-1">⏰ Campaign Ended</p>
-                          <p className="text-blue-800 dark:text-blue-200">
-                            The deadline has been reached. Finalize the campaign to determine if it was successful and
-                            release funds or enable refunds.
-                          </p>
+                {isCreator && campaign.status === "FUNDED" && (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+                      <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Campaign Successful!</p>
+                      <p className="text-green-800 dark:text-green-200 mb-2">
+                        Your campaign reached its goal. Funds have been automatically released to your wallet.
+                      </p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-green-700 dark:text-green-300">Total Raised:</span>
+                          <span className="font-medium">${formatCurrency(displayRaised)}</span>
                         </div>
-                        <Button
-                          className="w-full bg-blue-600 hover:bg-blue-700"
-                          onClick={handleFinalizeClick}
-                          disabled={isFinalizePending}
-                        >
-                          {isFinalizePending ? "Finalizing..." : "Finalize Campaign"}
-                        </Button>
-                      </div>
-                    )}
-
-                    {campaign.status === "FUNDED" && (
-                      <div className="space-y-2">
-                        <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
-                          <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Campaign Successful!</p>
-                          <p className="text-green-800 dark:text-green-200 mb-2">
-                            Your campaign reached its goal. Funds have been automatically released to your wallet.
-                          </p>
-                          <div className="space-y-1 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-green-700 dark:text-green-300">Total Raised:</span>
-                              <span className="font-medium">${formatCurrency(displayRaised)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-green-700 dark:text-green-300">Platform Fee (5%):</span>
-                              <span className="font-medium">-${formatCurrency(displayRaised * 0.05)}</span>
-                            </div>
-                            <div className="flex justify-between border-t border-green-200 dark:border-green-800 pt-1 mt-1">
-                              <span className="text-green-700 dark:text-green-300 font-medium">You Received:</span>
-                              <span className="font-bold">${formatCurrency(displayRaised * 0.95)}</span>
-                            </div>
-                          </div>
+                        <div className="flex justify-between">
+                          <span className="text-green-700 dark:text-green-300">Platform Fee (5%):</span>
+                          <span className="font-medium">-${formatCurrency(displayRaised * 0.05)}</span>
+                        </div>
+                        <div className="flex justify-between border-t border-green-200 dark:border-green-800 pt-1 mt-1">
+                          <span className="text-green-700 dark:text-green-300 font-medium">You Received:</span>
+                          <span className="font-bold">${formatCurrency(displayRaised * 0.95)}</span>
                         </div>
                       </div>
-                    )}
-                  </>
+                    </div>
+                  </div>
                 )}
 
                 {!isCreator && campaign.status === "FAILED" && blockchainId && (
@@ -440,6 +476,39 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                           You did not pledge to this campaign, so there is no refund to claim.
                         </p>
                       </div>
+                    )}
+                  </div>
+                )}
+
+                {isCreator && campaign.status === "FAILED" && blockchainId && userPledgeAmount > 0n && (
+                  <div className="space-y-2">
+                    {hasClaimedRefund ? (
+                      <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+                        <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Refund Claimed</p>
+                        <p className="text-green-800 dark:text-green-200">
+                          You have successfully claimed your refund of ${(Number(userPledgeAmount) / 1e6).toFixed(2)}{" "}
+                          USDC.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="p-3 bg-orange-50 dark:bg-orange-950 border border-orange-200 dark:border-orange-800 rounded-lg text-sm">
+                          <p className="font-medium text-orange-900 dark:text-orange-100 mb-1">❌ Campaign Failed</p>
+                          <p className="text-orange-800 dark:text-orange-200">
+                            This campaign did not reach its goal. You can claim a refund for your pledge of $
+                            {(Number(userPledgeAmount) / 1e6).toFixed(2)} USDC.
+                          </p>
+                        </div>
+                        <Button
+                          className="w-full bg-orange-600 hover:bg-orange-700"
+                          onClick={handleRefundClick}
+                          disabled={isRefundPending}
+                        >
+                          {isRefundPending
+                            ? "Processing Refund..."
+                            : `Claim Refund ($${(Number(userPledgeAmount) / 1e6).toFixed(2)} USDC)`}
+                        </Button>
+                      </>
                     )}
                   </div>
                 )}

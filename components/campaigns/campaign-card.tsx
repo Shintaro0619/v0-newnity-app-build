@@ -14,7 +14,7 @@ interface CampaignCardProps {
   backers?: number
   category: string
   daysLeft?: number
-  status?: "live" | "upcoming" | "funded"
+  status?: "live" | "upcoming" | "funded" | "failed" | "ended"
   blockchainCampaignId?: number
 }
 
@@ -36,6 +36,8 @@ export function CampaignCard({
 
   const progress = goal > 0 ? (raised / goal) * 100 : 0
 
+  const isEnded = status === "failed" || status === "funded" || status === "ended" || daysLeft === 0
+
   return (
     <Link href={`/campaigns/${id}`} aria-label={`View ${title} campaign`} className="block h-full">
       <Card className="overflow-hidden bg-gray-900 border-gray-800 hover:border-primary/40 transition-all group h-full flex flex-col">
@@ -46,17 +48,26 @@ export function CampaignCard({
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
           />
-          <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1">
-            <span className="text-xs">⏰</span>
-            <span className="text-xs font-medium text-white">{daysLeft} days left</span>
-          </div>
+          {isEnded ? (
+            <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1">
+              <span className="text-xs font-medium text-gray-400">ENDED</span>
+            </div>
+          ) : (
+            <div className="absolute bottom-2 right-2 bg-black/80 backdrop-blur-sm px-2 py-1 rounded-md flex items-center gap-1">
+              <span className="text-xs">⏰</span>
+              <span className="text-xs font-medium text-white">{daysLeft} days left</span>
+            </div>
+          )}
           {status === "upcoming" && (
             <Badge className="absolute top-2 left-2 bg-yellow-500/90 text-black border-0">Featured</Badge>
           )}
           {status === "funded" && (
             <Badge className="absolute top-2 left-2 bg-green-500/90 text-black border-0">Funded</Badge>
           )}
-          {status === "live" && (
+          {status === "failed" && (
+            <Badge className="absolute top-2 left-2 bg-red-500/90 text-white border-0">Failed</Badge>
+          )}
+          {status === "live" && !isEnded && (
             <Badge className="absolute top-2 left-2 bg-primary/90 text-black border-0">Featured</Badge>
           )}
         </div>
