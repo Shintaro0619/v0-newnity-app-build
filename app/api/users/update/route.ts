@@ -18,10 +18,29 @@ export async function POST(request: NextRequest) {
     `
 
     if (existingUsers.length === 0) {
-      // Create new user
       const newUsers = await sql`
-        INSERT INTO users (wallet_address, name, bio, website, avatar)
-        VALUES (${wallet_address}, ${name}, ${bio}, ${website}, ${avatar})
+        INSERT INTO users (
+          id,
+          email,
+          wallet_address,
+          name,
+          bio,
+          website,
+          avatar,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          gen_random_uuid()::text,
+          ${wallet_address.toLowerCase() + "@wallet.local"},
+          ${wallet_address},
+          ${name || "User " + wallet_address.slice(0, 6)},
+          ${bio || ""},
+          ${website || ""},
+          ${avatar || ""},
+          NOW(),
+          NOW()
+        )
         RETURNING *
       `
       return NextResponse.json(newUsers[0])
