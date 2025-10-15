@@ -39,6 +39,7 @@ interface CampaignData {
     mainImage: File | null
     gallery: File[]
     video: File | null
+    youtubeUrl: string
   }
   funding: {
     goal: number
@@ -85,6 +86,7 @@ const initialCampaignData: CampaignData = {
     mainImage: null,
     gallery: [],
     video: null,
+    youtubeUrl: "",
   },
   funding: {
     goal: 0,
@@ -481,6 +483,9 @@ export default function CreateCampaignPage() {
         "data",
         JSON.stringify({
           basic: campaignData.basic,
+          media: {
+            youtubeUrl: campaignData.media.youtubeUrl,
+          },
           funding: {
             ...campaignData.funding,
             duration,
@@ -503,14 +508,16 @@ export default function CreateCampaignPage() {
         })
       }
 
-      if (campaignData.media.video) {
-        formData.append("video", campaignData.media.video)
-      }
+      // The original code block had a `video` upload here. It's being removed as per the update.
+      // if (campaignData.media.video) {
+      //   formData.append("video", campaignData.media.video)
+      // }
 
       console.log("[v0] Creating campaign with media files:", {
         hasCoverImage: !!campaignData.media.mainImage,
         galleryCount: campaignData.media.gallery?.length || 0,
-        hasVideo: !!campaignData.media.video,
+        // hasVideo: !!campaignData.media.video, // This will now be false
+        hasYoutubeUrl: !!campaignData.media.youtubeUrl, // Added check for YouTube URL
       })
 
       const response = await fetch("/api/campaigns/create", {
@@ -559,12 +566,13 @@ export default function CreateCampaignPage() {
     }))
   }, [])
 
-  const handleVideoChange = useCallback((files: File[]) => {
-    setCampaignData((prev) => ({
-      ...prev,
-      media: { ...prev.media, video: files[0] || null },
-    }))
-  }, [])
+  // The original code block had handleVideoChange. It's being removed as per the update.
+  // const handleVideoChange = useCallback((files: File[]) => {
+  //   setCampaignData((prev) => ({
+  //     ...prev,
+  //     media: { ...prev.media, video: files[0] || null },
+  //   }))
+  // }, [])
 
   const handleMediaError = useCallback((error: string) => {
     setErrors((prev) => ({ ...prev, media: error }))
@@ -761,7 +769,7 @@ export default function CreateCampaignPage() {
                         <ImageIcon className="h-5 w-5" />
                         Campaign Media
                       </CardTitle>
-                      <CardDescription>Upload images and videos to showcase your campaign</CardDescription>
+                      <CardDescription>Upload images and add video to showcase your campaign</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-8">
                       <Alert>
@@ -801,15 +809,61 @@ export default function CreateCampaignPage() {
 
                       <Separator />
 
-                      <MediaUpload
-                        type="video"
-                        title="Campaign Video"
-                        description="A video pitch can significantly boost your campaign (optional)"
-                        maxSize={100 * 1024 * 1024}
-                        showPreview={true}
-                        onFilesChange={handleVideoChange}
-                        onError={handleMediaError}
-                      />
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="youtubeUrl" className="text-base font-semibold">
+                            Campaign Video (YouTube)
+                          </Label>
+                          <p className="text-sm text-muted-foreground">
+                            Add a YouTube video to showcase your campaign. Videos can significantly boost engagement!
+                          </p>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="youtubeUrl">YouTube URL</Label>
+                          <Input
+                            id="youtubeUrl"
+                            type="url"
+                            value={campaignData.media.youtubeUrl}
+                            onChange={(e) =>
+                              setCampaignData((prev) => ({
+                                ...prev,
+                                media: { ...prev.media, youtubeUrl: e.target.value },
+                              }))
+                            }
+                            placeholder="https://www.youtube.com/watch?v=..."
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/shorts
+                            links.
+                          </p>
+                        </div>
+
+                        {campaignData.media.youtubeUrl && (
+                          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                            <iframe
+                              src={(() => {
+                                const url = campaignData.media.youtubeUrl
+                                const patterns = [
+                                  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                                  /youtube\.com\/shorts\/([^&\n?#]+)/,
+                                ]
+                                for (const pattern of patterns) {
+                                  const match = url.match(pattern)
+                                  if (match && match[1]) {
+                                    return `https://www.youtube.com/embed/${match[1]}`
+                                  }
+                                }
+                                return ""
+                              })()}
+                              title="Campaign video preview"
+                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                              allowFullScreen
+                              className="w-full h-full"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>

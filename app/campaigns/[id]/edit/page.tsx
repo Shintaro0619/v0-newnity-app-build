@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { useAccount } from "wagmi"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,7 +27,6 @@ import {
   Users,
   DollarSign,
   AlertTriangle,
-  CheckCircle,
   Clock,
   BarChart3,
   Edit3,
@@ -98,7 +97,6 @@ export default function EditCampaignPage() {
         }
         const data = await response.json()
 
-        // Transform API data to match Campaign interface
         const transformedCampaign: Campaign = {
           id: data.id,
           title: data.title,
@@ -109,17 +107,17 @@ export default function EditCampaignPage() {
           currency: data.currency,
           duration: data.duration,
           category: data.category,
-          tags: data.tags || [],
+          tags: Array.isArray(data.tags) ? data.tags : [],
           status: data.status,
           coverImage: data.cover_image,
-          gallery: data.gallery || [],
+          gallery: Array.isArray(data.gallery) ? data.gallery : [],
           videoUrl: data.video_url,
           startDate: data.start_date,
           endDate: data.end_date,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
-          tiers: data.tiers || [],
-          milestones: data.milestones || [],
+          tiers: Array.isArray(data.tiers) ? data.tiers : [],
+          milestones: Array.isArray(data.milestones) ? data.milestones : [],
         }
 
         setCampaign(transformedCampaign)
@@ -178,9 +176,9 @@ export default function EditCampaignPage() {
     }
   }
 
-  const updateCampaign = (updates: Partial<Campaign>) => {
+  const updateCampaign = useCallback((updates: Partial<Campaign>) => {
     setCampaign((prev) => (prev ? { ...prev, ...updates } : null))
-  }
+  }, [])
 
   const addTier = () => {
     if (!campaign) return
@@ -199,13 +197,16 @@ export default function EditCampaignPage() {
     })
   }
 
-  const updateTier = (tierId: string, updates: Partial<Tier>) => {
-    if (!campaign) return
+  const updateTier = useCallback(
+    (tierId: string, updates: Partial<Tier>) => {
+      if (!campaign) return
 
-    updateCampaign({
-      tiers: campaign.tiers.map((tier) => (tier.id === tierId ? { ...tier, ...updates } : tier)),
-    })
-  }
+      updateCampaign({
+        tiers: campaign.tiers.map((tier) => (tier.id === tierId ? { ...tier, ...updates } : tier)),
+      })
+    },
+    [campaign, updateCampaign],
+  )
 
   const removeTier = (tierId: string) => {
     if (!campaign) return
@@ -246,6 +247,36 @@ export default function EditCampaignPage() {
     updateCampaign({
       milestones: campaign.milestones.filter((milestone) => milestone.id !== milestoneId),
     })
+  }
+
+  const handleCoverImageChange = useCallback(
+    (files: File[]) => {
+      if (files.length > 0) {
+        const url = URL.createObjectURL(files[0])
+        updateCampaign({ coverImage: url })
+      }
+    },
+    [updateCampaign],
+  )
+
+  const handleGalleryChange = useCallback(
+    (files: File[]) => {
+      const urls = files.map((file) => URL.createObjectURL(file))
+      updateCampaign({ gallery: urls })
+    },
+    [updateCampaign],
+  )
+
+  const handleEndDateChange = (endDate: string) => {
+    if (campaign?.startDate && endDate) {
+      const start = new Date(campaign.startDate)
+      const end = new Date(endDate)
+      const diffTime = Math.abs(end.getTime() - start.getTime())
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
+      updateCampaign({ endDate, duration: diffDays })
+    } else {
+      updateCampaign({ endDate })
+    }
   }
 
   if (!isConnected) {
@@ -335,32 +366,33 @@ export default function EditCampaignPage() {
                 Analytics
               </Link>
             </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? (
-                <>
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-4 w-4 mr-2" />
-                  Save Changes
-                </>
-              )}
-            </Button>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-3">
+            <div className="mb-4 flex justify-end">
+              <Button onClick={handleSave} disabled={saving} size="lg" className="bg-primary hover:bg-primary/90">
+                {saving ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="basic">Basic Info</TabsTrigger>
                 <TabsTrigger value="media">Media</TabsTrigger>
                 <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
-                <TabsTrigger value="milestones">Milestones</TabsTrigger>
-                <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-6">
@@ -463,18 +495,19 @@ export default function EditCampaignPage() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="duration">Duration (days)</Label>
+                        <Label htmlFor="endDate">Campaign End Date</Label>
                         <div className="relative">
-                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
                           <Input
-                            id="duration"
-                            type="number"
-                            value={campaign.duration}
-                            onChange={(e) => updateCampaign({ duration: Number(e.target.value) })}
+                            id="endDate"
+                            type="date"
+                            value={campaign.endDate ? campaign.endDate.split("T")[0] : ""}
+                            onChange={(e) => handleEndDateChange(e.target.value)}
                             className="pl-10"
-                            placeholder="30"
+                            min={new Date().toISOString().split("T")[0]}
                           />
                         </div>
+                        <p className="text-sm text-muted-foreground">Duration: {campaign.duration} days</p>
                       </div>
                     </div>
 
@@ -508,12 +541,9 @@ export default function EditCampaignPage() {
                       description="Main image that represents your campaign (recommended: 1920x1080)"
                       multiple={false}
                       maxFiles={1}
-                      onFilesChange={(files) => {
-                        if (files.length > 0) {
-                          updateCampaign({ coverImage: URL.createObjectURL(files[0]) })
-                        }
-                      }}
+                      onFilesChange={handleCoverImageChange}
                       enableCompression={true}
+                      initialFiles={campaign.coverImage ? [campaign.coverImage] : []}
                     />
 
                     <Separator />
@@ -524,11 +554,9 @@ export default function EditCampaignPage() {
                       description="Additional images to showcase your project (up to 10 images)"
                       multiple={true}
                       maxFiles={10}
-                      onFilesChange={(files) => {
-                        const urls = files.map((file) => URL.createObjectURL(file))
-                        updateCampaign({ gallery: urls })
-                      }}
+                      onFilesChange={handleGalleryChange}
                       enableCompression={true}
+                      initialFiles={campaign.gallery}
                     />
 
                     <Separator />
@@ -597,10 +625,19 @@ export default function EditCampaignPage() {
                                 <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                 <Input
                                   type="number"
-                                  value={tier.amount}
-                                  onChange={(e) => updateTier(tier.id, { amount: Number(e.target.value) })}
+                                  value={tier.amount || ""}
+                                  onChange={(e) => {
+                                    const value = e.target.value === "" ? 0 : Number(e.target.value)
+                                    updateTier(tier.id, { amount: value })
+                                  }}
+                                  onFocus={(e) => {
+                                    if (e.target.value === "0") {
+                                      e.target.select()
+                                    }
+                                  }}
                                   className="pl-10"
                                   placeholder="25"
+                                  min="0"
                                 />
                               </div>
                             </div>
@@ -692,207 +729,23 @@ export default function EditCampaignPage() {
                   </CardContent>
                 </Card>
               </TabsContent>
-
-              <TabsContent value="milestones" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <CheckCircle className="h-5 w-5" />
-                          Development Milestones
-                        </CardTitle>
-                        <CardDescription>Track your project's progress with milestones</CardDescription>
-                      </div>
-                      <Button onClick={addMilestone}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Milestone
-                      </Button>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    {campaign.milestones.map((milestone, index) => (
-                      <Card key={milestone.id} className="relative">
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Milestone {index + 1}</CardTitle>
-                            <div className="flex items-center space-x-2">
-                              <Badge
-                                variant={
-                                  milestone.status === "COMPLETED"
-                                    ? "default"
-                                    : milestone.status === "IN_PROGRESS"
-                                      ? "secondary"
-                                      : milestone.status === "FAILED"
-                                        ? "destructive"
-                                        : "outline"
-                                }
-                              >
-                                {milestone.status.replace("_", " ")}
-                              </Badge>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeMilestone(milestone.id)}
-                                className="text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Milestone Title</Label>
-                            <Input
-                              value={milestone.title}
-                              onChange={(e) => updateMilestone(milestone.id, { title: e.target.value })}
-                              placeholder="Core Gameplay"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Description</Label>
-                            <Textarea
-                              value={milestone.description}
-                              onChange={(e) => updateMilestone(milestone.id, { description: e.target.value })}
-                              placeholder="Complete basic VR mechanics and movement system"
-                              rows={2}
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Target Date</Label>
-                              <Input
-                                type="date"
-                                value={milestone.targetDate || ""}
-                                onChange={(e) => updateMilestone(milestone.id, { targetDate: e.target.value })}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Status</Label>
-                              <Select
-                                value={milestone.status}
-                                onValueChange={(value: any) => updateMilestone(milestone.id, { status: value })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="PENDING">Pending</SelectItem>
-                                  <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                                  <SelectItem value="COMPLETED">Completed</SelectItem>
-                                  <SelectItem value="FAILED">Failed</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))}
-
-                    {campaign.milestones.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <CheckCircle className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No milestones yet. Add milestones to track your progress.</p>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="settings" className="space-y-6">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Settings className="h-5 w-5" />
-                      Campaign Settings
-                    </CardTitle>
-                    <CardDescription>Advanced campaign configuration</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>Campaign Status</Label>
-                      <Select value={campaign.status} onValueChange={(value: any) => updateCampaign({ status: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="DRAFT">Draft</SelectItem>
-                          <SelectItem value="REVIEW">Under Review</SelectItem>
-                          <SelectItem value="ACTIVE">Active</SelectItem>
-                          <SelectItem value="SUCCESSFUL">Successful</SelectItem>
-                          <SelectItem value="FAILED">Failed</SelectItem>
-                          <SelectItem value="CANCELLED">Cancelled</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>Start Date</Label>
-                        <Input
-                          type="date"
-                          value={campaign.startDate || ""}
-                          onChange={(e) => updateCampaign({ startDate: e.target.value })}
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>End Date</Label>
-                        <Input
-                          type="date"
-                          value={campaign.endDate || ""}
-                          onChange={(e) => updateCampaign({ endDate: e.target.value })}
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Currency</Label>
-                      <Select value={campaign.currency} onValueChange={(value) => updateCampaign({ currency: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USDC">USDC</SelectItem>
-                          <SelectItem value="ETH">ETH</SelectItem>
-                          <SelectItem value="USD">USD</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-destructive">Danger Zone</CardTitle>
-                    <CardDescription>Irreversible actions for your campaign</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <Alert>
-                      <AlertTriangle className="h-4 w-4" />
-                      <AlertDescription>These actions cannot be undone. Please proceed with caution.</AlertDescription>
-                    </Alert>
-
-                    <div className="flex space-x-2">
-                      <Button variant="destructive" size="sm">
-                        Cancel Campaign
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground bg-transparent"
-                      >
-                        Delete Campaign
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
             </Tabs>
+
+            <div className="mt-6 flex justify-end">
+              <Button onClick={handleSave} disabled={saving} size="lg" className="bg-primary hover:bg-primary/90">
+                {saving ? (
+                  <>
+                    <Clock className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
 
           {/* Sidebar */}

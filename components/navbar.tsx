@@ -5,9 +5,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
 import { Input } from "@/components/ui/input"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import { subscribeToConnecting } from "@/components/wallet-connect-button"
 
 const WalletConnectButton = dynamic(
   () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
@@ -24,7 +25,13 @@ const WalletConnectButton = dynamic(
 export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showMobileSearch, setShowMobileSearch] = useState(false)
+  const [isWalletConnecting, setIsWalletConnecting] = useState(false)
   const router = useRouter()
+
+  useEffect(() => {
+    const unsubscribe = subscribeToConnecting(setIsWalletConnecting)
+    return () => unsubscribe()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -35,7 +42,11 @@ export function Navbar() {
   }
 
   return (
-    <nav className="fixed top-0 z-50 w-full border-b border-primary/20 bg-black/80 backdrop-blur-nav supports-[backdrop-filter]:bg-black/60">
+    <nav
+      className={`fixed top-0 z-50 w-full border-b border-primary/20 bg-black/80 backdrop-blur-nav supports-[backdrop-filter]:bg-black/60 ${
+        isWalletConnecting ? "pointer-events-none" : ""
+      }`}
+    >
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center space-x-2">
           <BrandMark size={32} />

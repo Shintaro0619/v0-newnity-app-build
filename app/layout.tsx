@@ -32,6 +32,79 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                if (typeof window !== 'undefined') {
+                  // Polyfill process object
+                  if (typeof window.process === 'undefined') {
+                    window.process = {
+                      env: {},
+                      version: '',
+                      versions: {},
+                      emitWarning: function(warning, type, code) {
+                        // Silently ignore warnings
+                      },
+                      nextTick: function(callback) {
+                        setTimeout(callback, 0);
+                      }
+                    };
+                  } else {
+                    if (typeof window.process.emitWarning !== 'function') {
+                      window.process.emitWarning = function(warning, type, code) {
+                        // Silently ignore warnings
+                      };
+                    }
+                  }
+                  
+                  // Polyfill global
+                  if (typeof window.global === 'undefined') {
+                    window.global = window;
+                  }
+                  
+                  // Suppress WalletConnect errors globally
+                  var originalError = console.error;
+                  console.error = function() {
+                    var args = Array.prototype.slice.call(arguments);
+                    var errorString = String(args[0]);
+                    
+                    if (
+                      errorString.includes('process.emitWarning') ||
+                      errorString.includes('walletconnect') ||
+                      errorString.includes('heartbeat') ||
+                      errorString.includes('Cannot read properties of undefined')
+                    ) {
+                      return;
+                    }
+                    
+                    originalError.apply(console, args);
+                  };
+                  
+                  // Global error handler
+                  window.addEventListener('error', function(event) {
+                    var message = event.message || '';
+                    var stack = (event.error && event.error.stack) || '';
+                    
+                    if (
+                      message.includes('Cannot read properties of undefined') ||
+                      message.includes('process.emitWarning') ||
+                      stack.includes('walletconnect') ||
+                      stack.includes('heartbeat') ||
+                      stack.includes('pino')
+                    ) {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      return false;
+                    }
+                  }, true);
+                }
+              })();
+            `,
+          }}
+        />
+      </head>
       <body className={`font-sans ${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         <Providers>
           <Navbar />

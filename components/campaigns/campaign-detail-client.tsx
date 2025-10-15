@@ -22,6 +22,7 @@ interface CampaignDetailClientProps {
 export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDetailClientProps) {
   const [campaign, setCampaign] = useState(initialCampaign)
   const [showPledgeModal, setShowPledgeModal] = useState(false)
+  const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0)
   const blockchainDataLoaded = useRef(false)
   const [blockchainFunding, setBlockchainFunding] = useState<{
     raised: number
@@ -238,6 +239,28 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }).format(amount)
   }
 
+  const getYouTubeEmbedUrl = (url: string | null) => {
+    if (!url) return null
+
+    // Handle various YouTube URL formats
+    const patterns = [
+      /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+      /youtube\.com\/shorts\/([^&\n?#]+)/,
+    ]
+
+    for (const pattern of patterns) {
+      const match = url.match(pattern)
+      if (match && match[1]) {
+        return `https://www.youtube.com/embed/${match[1]}`
+      }
+    }
+
+    return null
+  }
+
+  const youtubeEmbedUrl = getYouTubeEmbedUrl(campaign.video_url)
+  const hasGallery = campaign.gallery && campaign.gallery.length > 0
+
   return (
     <div className="min-h-screen bg-background">
       <div className="container mx-auto px-4 py-8 pt-20">
@@ -281,12 +304,75 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
               />
             </div>
 
+            {youtubeEmbedUrl && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Campaign Video</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                    <iframe
+                      src={youtubeEmbedUrl}
+                      title="Campaign video"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      allowFullScreen
+                      className="w-full h-full"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {hasGallery && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Gallery</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {/* Main selected image */}
+                  <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                    <img
+                      src={campaign.gallery[selectedGalleryIndex] || "/placeholder.svg"}
+                      alt={`Gallery image ${selectedGalleryIndex + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+
+                  {/* Thumbnail grid */}
+                  {campaign.gallery.length > 1 && (
+                    <div className="grid grid-cols-4 gap-2">
+                      {campaign.gallery.map((imageUrl: string, index: number) => (
+                        <button
+                          key={index}
+                          onClick={() => setSelectedGalleryIndex(index)}
+                          className={`aspect-square bg-muted rounded-lg overflow-hidden border-2 transition-all ${
+                            selectedGalleryIndex === index
+                              ? "border-primary ring-2 ring-primary/20"
+                              : "border-transparent hover:border-muted-foreground/20"
+                          }`}
+                        >
+                          <img
+                            src={imageUrl || "/placeholder.svg"}
+                            alt={`Gallery thumbnail ${index + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle>About This Project</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <p className="text-muted-foreground leading-relaxed">{campaign.story || campaign.description}</p>
+                <div
+                  className="text-muted-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+                  dangerouslySetInnerHTML={{ __html: campaign.story || campaign.description }}
+                />
               </CardContent>
             </Card>
 

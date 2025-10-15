@@ -10,12 +10,13 @@ import { ImageIcon, Video, Upload, X, Eye, Download, AlertTriangle, CheckCircle,
 import Image from "next/image"
 
 interface MediaFile {
-  file: File
+  file?: File
   preview: string
   id: string
   status: "uploading" | "success" | "error"
   progress: number
   compressed?: File
+  isExisting?: boolean
 }
 
 interface MediaUploadProps {
@@ -24,8 +25,9 @@ interface MediaUploadProps {
   description: string
   multiple?: boolean
   maxFiles?: number
-  maxSize?: number // in bytes
+  maxSize?: number
   acceptedFormats?: string[]
+  initialFiles?: string[]
   onFilesChange: (files: File[]) => void
   onError?: (error: string) => void
   className?: string
@@ -40,8 +42,9 @@ export function MediaUpload({
   description,
   multiple = false,
   maxFiles = 10,
-  maxSize = 10 * 1024 * 1024, // 10MB default
+  maxSize = 10 * 1024 * 1024,
   acceptedFormats,
+  initialFiles = [],
   onFilesChange,
   onError,
   className = "",
@@ -52,8 +55,22 @@ export function MediaUpload({
   const [mediaFiles, setMediaFiles] = useState<MediaFile[]>([])
   const [isProcessing, setIsProcessing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const initialFilesLoadedRef = useRef(false)
 
-  // Default accepted formats based on type
+  useEffect(() => {
+    if (initialFiles.length > 0 && !initialFilesLoadedRef.current) {
+      const existingMediaFiles: MediaFile[] = initialFiles.map((url, index) => ({
+        preview: url,
+        id: `existing-${index}-${Date.now()}`,
+        status: "success" as const,
+        progress: 100,
+        isExisting: true,
+      }))
+      setMediaFiles(existingMediaFiles)
+      initialFilesLoadedRef.current = true
+    }
+  }, [initialFiles])
+
   const getAcceptedTypes = () => {
     if (acceptedFormats) {
       return acceptedFormats.reduce(
@@ -80,7 +97,6 @@ export function MediaUpload({
     }
   }
 
-  // Compress image file
   const compressImage = async (file: File): Promise<File> => {
     return new Promise((resolve) => {
       const canvas = document.createElement("canvas")
@@ -88,7 +104,6 @@ export function MediaUpload({
       const img = new window.Image()
 
       img.onload = () => {
-        // Calculate new dimensions (max 1920x1080)
         const maxWidth = 1920
         const maxHeight = 1080
         let { width, height } = img
@@ -108,7 +123,6 @@ export function MediaUpload({
         canvas.width = width
         canvas.height = height
 
-        // Draw and compress
         ctx?.drawImage(img, 0, 0, width, height)
         canvas.toBlob(
           (blob) => {
@@ -131,7 +145,6 @@ export function MediaUpload({
     })
   }
 
-  // Process uploaded files
   const processFiles = async (files: File[]) => {
     setIsProcessing(true)
 
@@ -145,18 +158,15 @@ export function MediaUpload({
 
     setMediaFiles((prev) => [...prev, ...newMediaFiles])
 
-    // Process each file
     for (let i = 0; i < newMediaFiles.length; i++) {
       const mediaFile = newMediaFiles[i]
 
       try {
-        // Simulate upload progress
         for (let progress = 0; progress <= 100; progress += 20) {
           await new Promise((resolve) => setTimeout(resolve, 100))
           setMediaFiles((prev) => prev.map((f) => (f.id === mediaFile.id ? { ...f, progress } : f)))
         }
 
-        // Compress image if enabled
         let processedFile = mediaFile.file
         if (enableCompression && type === "image" && mediaFile.file.type.startsWith("image/")) {
           processedFile = await compressImage(mediaFile.file)
@@ -178,7 +188,6 @@ export function MediaUpload({
 
   const onDrop = useCallback(
     (acceptedFiles: File[], rejectedFiles: any[]) => {
-      // Handle rejected files
       rejectedFiles.forEach((rejection) => {
         const { file, errors } = rejection
         errors.forEach((error: any) => {
@@ -190,7 +199,6 @@ export function MediaUpload({
         })
       })
 
-      // Check max files limit
       if (mediaFiles.length + acceptedFiles.length > maxFiles) {
         onError?.(`Maximum ${maxFiles} files allowed`)
         return
@@ -227,6 +235,7 @@ export function MediaUpload({
   const clearAll = () => {
     mediaFiles.forEach((file) => URL.revokeObjectURL(file.preview))
     setMediaFiles([])
+    initialFilesLoadedRef.current = false
   }
 
   const formatFileSize = (bytes: number) => {
@@ -237,20 +246,24 @@ export function MediaUpload({
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
 
-  useEffect(() => {
-    const successfulFiles = mediaFiles.filter((f) => f.status === "success").map((f) => f.compressed || f.file)
+  const notifyFilesChange = useCallback(() => {
+    const successfulFiles = mediaFiles
+      .filter((f) => f.status === "success" && !f.isExisting && f.file)
+      .map((f) => f.compressed || f.file!)
     onFilesChange(successfulFiles)
   }, [mediaFiles, onFilesChange])
 
+  useEffect(() => {
+    notifyFilesChange()
+  }, [notifyFilesChange])
+
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Header */}
       <div>
         <h3 className="text-lg font-semibold">{title}</h3>
         <p className="text-sm text-muted-foreground">{description}</p>
       </div>
 
-      {/* Upload Area */}
       <div
         {...getRootProps()}
         onClick={handleClick}
@@ -302,7 +315,6 @@ export function MediaUpload({
         </div>
       </div>
 
-      {/* File Previews */}
       {showPreview && mediaFiles.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -313,12 +325,11 @@ export function MediaUpload({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {mediaFiles.map((mediaFile) => (
               <div key={mediaFile.id} className="relative border rounded-lg p-3 space-y-3 bg-card">
-                {/* Preview */}
                 <div className="relative aspect-video bg-muted rounded-md overflow-hidden">
-                  {mediaFile.file.type.startsWith("image/") ? (
+                  {mediaFile.preview && (mediaFile.file?.type.startsWith("image/") || mediaFile.isExisting) ? (
                     <Image
                       src={mediaFile.preview || "/placeholder.svg"}
-                      alt={mediaFile.file.name}
+                      alt={mediaFile.file?.name || "Campaign image"}
                       fill
                       className="object-cover"
                     />
@@ -328,7 +339,6 @@ export function MediaUpload({
                     </div>
                   )}
 
-                  {/* Status Overlay */}
                   {mediaFile.status === "uploading" && (
                     <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
                       <div className="text-white text-center space-y-2">
@@ -344,7 +354,6 @@ export function MediaUpload({
                     </div>
                   )}
 
-                  {/* Remove Button */}
                   <Button
                     variant="destructive"
                     size="sm"
@@ -355,11 +364,10 @@ export function MediaUpload({
                   </Button>
                 </div>
 
-                {/* File Info */}
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium truncate" title={mediaFile.file.name}>
-                      {mediaFile.file.name}
+                    <p className="text-sm font-medium truncate" title={mediaFile.file?.name || "Existing image"}>
+                      {mediaFile.file?.name || "Existing image"}
                     </p>
                     <Badge
                       variant={
@@ -374,27 +382,32 @@ export function MediaUpload({
                     </Badge>
                   </div>
 
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{formatFileSize(mediaFile.file.size)}</span>
-                    {mediaFile.compressed && (
-                      <span className="text-green-600">Compressed ({formatFileSize(mediaFile.compressed.size)})</span>
-                    )}
-                  </div>
+                  {mediaFile.file && (
+                    <>
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{formatFileSize(mediaFile.file.size)}</span>
+                        {mediaFile.compressed && (
+                          <span className="text-green-600">
+                            Compressed ({formatFileSize(mediaFile.compressed.size)})
+                          </span>
+                        )}
+                      </div>
 
-                  {/* Action Buttons */}
-                  <div className="flex space-x-1">
-                    <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
-                      <Eye className="h-3 w-3" />
-                    </Button>
-                    {enableCropping && mediaFile.file.type.startsWith("image/") && (
-                      <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
-                        <Crop className="h-3 w-3" />
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
-                      <Download className="h-3 w-3" />
-                    </Button>
-                  </div>
+                      <div className="flex space-x-1">
+                        <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
+                          <Eye className="h-3 w-3" />
+                        </Button>
+                        {enableCropping && mediaFile.file.type.startsWith("image/") && (
+                          <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
+                            <Crop className="h-3 w-3" />
+                          </Button>
+                        )}
+                        <Button variant="outline" size="sm" className="h-7 px-2 bg-transparent">
+                          <Download className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ))}
@@ -402,7 +415,6 @@ export function MediaUpload({
         </div>
       )}
 
-      {/* Upload Stats */}
       {mediaFiles.length > 0 && (
         <Alert>
           <CheckCircle className="h-4 w-4" />
@@ -413,7 +425,10 @@ export function MediaUpload({
                 {" "}
                 • Compression saved{" "}
                 {formatFileSize(
-                  mediaFiles.reduce((acc, f) => acc + (f.compressed ? f.file.size - f.compressed.size : 0), 0),
+                  mediaFiles.reduce(
+                    (acc, f) => acc + (f.compressed && f.file ? f.file.size - f.compressed.size : 0),
+                    0,
+                  ),
                 )}
               </>
             )}

@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       tags: basic.tags || [],
       cover_image: coverImageUrl,
       gallery: galleryUrls,
-      video_url: undefined,
+      video_url: media?.youtubeUrl || undefined,
       duration: funding.duration,
       contract_tx_hash: undefined,
       escrow_address: undefined,
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
       status: "active",
       coverImage: coverImageUrl,
       gallery: galleryUrls,
+      videoUrl: media?.youtubeUrl || null,
     })
   } catch (error) {
     console.error("[v0] Campaign creation error:", error)
