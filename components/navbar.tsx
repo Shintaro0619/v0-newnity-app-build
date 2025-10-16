@@ -9,6 +9,7 @@ import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { subscribeToConnecting } from "@/components/wallet-connect-button"
+import { AuthButton } from "@/components/auth-button"
 
 const WalletConnectButton = dynamic(
   () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
@@ -114,6 +115,8 @@ export function Navbar() {
           >
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
+
+          <AuthButton />
 
           <WalletConnectButton />
 

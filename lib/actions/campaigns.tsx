@@ -615,23 +615,35 @@ export async function finalizeCampaignInDatabase(data: {
   totalAmount: number
 }) {
   try {
-    console.log("[v0] Finalizing campaign in database:", data)
+    console.log("[v0] [SERVER ACTION] finalizeCampaignInDatabase called with:", {
+      campaignId: data.campaignId,
+      successful: data.successful,
+      txHash: data.txHash,
+      totalAmount: data.totalAmount,
+    })
 
     const status = data.successful ? "FUNDED" : "FAILED"
+    console.log("[v0] [SERVER ACTION] Setting campaign status to:", status)
 
-    await sql`
+    const result = await sql`
       UPDATE campaigns
       SET 
         status = ${status},
         raised_amount = ${data.totalAmount},
         updated_at = NOW()
       WHERE id = ${data.campaignId}
+      RETURNING *
     `
 
-    console.log("[v0] Campaign finalized in database successfully")
-    return { success: true }
+    console.log("[v0] [SERVER ACTION] Campaign finalized in database successfully:", {
+      campaignId: result[0]?.id,
+      status: result[0]?.status,
+      raised_amount: result[0]?.raised_amount,
+    })
+
+    return { success: true, campaign: result[0] }
   } catch (error) {
-    console.error("[v0] Error finalizing campaign in database:", error)
+    console.error("[v0] [SERVER ACTION] Error finalizing campaign in database:", error)
     return { success: false, error: String(error) }
   }
 }
@@ -643,12 +655,18 @@ export async function saveRefundToDatabase(data: {
   txHash: string
 }) {
   try {
-    console.log("[v0] Saving refund to database:", data)
+    console.log("[v0] [SERVER ACTION] saveRefundToDatabase called with:", {
+      campaignId: data.campaignId,
+      backerWalletAddress: data.backerWalletAddress,
+      amount: data.amount,
+      txHash: data.txHash,
+    })
 
     const backerId = await ensureUserExists(data.backerWalletAddress)
+    console.log("[v0] [SERVER ACTION] Backer ID:", backerId)
 
     // Update pledge status to REFUNDED
-    await sql`
+    const pledgeResult = await sql`
       UPDATE pledges
       SET 
         status = 'REFUNDED',
@@ -656,21 +674,33 @@ export async function saveRefundToDatabase(data: {
       WHERE campaign_id = ${data.campaignId}
         AND backer_id = ${backerId}
         AND status = 'CONFIRMED'
+      RETURNING *
     `
 
-    await sql`
+    console.log("[v0] [SERVER ACTION] Updated pledges:", {
+      count: pledgeResult.length,
+      pledgeIds: pledgeResult.map((p) => p.id),
+    })
+
+    const campaignResult = await sql`
       UPDATE campaigns
       SET 
         status = 'FAILED',
         updated_at = NOW()
       WHERE id = ${data.campaignId}
         AND status != 'FUNDED'
+      RETURNING *
     `
 
-    console.log("[v0] Refund saved to database successfully")
+    console.log("[v0] [SERVER ACTION] Updated campaign:", {
+      campaignId: campaignResult[0]?.id,
+      status: campaignResult[0]?.status,
+    })
+
+    console.log("[v0] [SERVER ACTION] Refund saved to database successfully")
     return { success: true }
   } catch (error) {
-    console.error("[v0] Error saving refund to database:", error)
+    console.error("[v0] [SERVER ACTION] Error saving refund to database:", error)
     return { success: false, error: String(error) }
   }
 }
@@ -684,22 +714,35 @@ export async function saveFundsReleaseToDatabase(data: {
   txHash: string
 }) {
   try {
-    console.log("[v0] Saving funds release to database:", data)
+    console.log("[v0] [SERVER ACTION] saveFundsReleaseToDatabase called with:", {
+      campaignId: data.campaignId,
+      creatorAddress: data.creatorAddress,
+      totalAmount: data.totalAmount,
+      platformFee: data.platformFee,
+      creatorAmount: data.creatorAmount,
+      txHash: data.txHash,
+    })
 
     // Update campaign with withdrawal information
-    await sql`
+    const result = await sql`
       UPDATE campaigns
       SET 
         status = 'FUNDED',
         raised_amount = ${data.totalAmount},
         updated_at = NOW()
       WHERE id = ${data.campaignId}
+      RETURNING *
     `
 
-    console.log("[v0] Funds release saved to database successfully")
-    return { success: true }
+    console.log("[v0] [SERVER ACTION] Funds release saved to database successfully:", {
+      campaignId: result[0]?.id,
+      status: result[0]?.status,
+      raised_amount: result[0]?.raised_amount,
+    })
+
+    return { success: true, campaign: result[0] }
   } catch (error) {
-    console.error("[v0] Error saving funds release to database:", error)
+    console.error("[v0] [SERVER ACTION] Error saving funds release to database:", error)
     return { success: false, error: String(error) }
   }
 }

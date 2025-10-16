@@ -118,65 +118,109 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   }, [campaignData, blockchainId])
 
   const handleFinalizeClick = async () => {
-    console.log("[v0] handleFinalizeClick called")
-    console.log("[v0] blockchainId:", blockchainId)
+    console.log("[v0] [CLIENT] handleFinalizeClick called")
+    console.log("[v0] [CLIENT] Current state:", {
+      blockchainId,
+      campaignStatus: campaign.status,
+      isCreator,
+      hasDeadlinePassed,
+      isBlockchainFinalized,
+    })
 
     if (!blockchainId) {
-      console.error("[v0] No blockchain campaign ID")
+      console.error("[v0] [CLIENT] No blockchain campaign ID - cannot finalize")
+      toast.error("Cannot finalize: Campaign not deployed to blockchain")
       return
     }
 
-    console.log("[v0] Showing confirmation dialog")
+    console.log("[v0] [CLIENT] Showing confirmation dialog")
     const confirmed = window.confirm(
       "Are you sure you want to finalize this campaign? This action cannot be undone. " +
         "If the campaign reached its goal, funds will be released to you. " +
         "If not, backers will be able to claim refunds.",
     )
 
-    console.log("[v0] Confirmation result:", confirmed)
+    console.log("[v0] [CLIENT] Confirmation result:", confirmed)
     if (!confirmed) {
-      console.log("[v0] User cancelled finalization")
+      console.log("[v0] [CLIENT] User cancelled finalization")
       return
     }
 
     try {
-      console.log("[v0] Calling handleFinalize with campaignId:", blockchainId)
+      console.log("[v0] [CLIENT] Calling handleFinalize with campaignId:", blockchainId)
+      console.log("[v0] [CLIENT] Campaign data before finalize:", {
+        totalPledged: campaignData?.totalPledged?.toString(),
+        goal: campaignData?.goal?.toString(),
+        deadline: campaignData?.deadline?.toString(),
+        finalized: campaignData?.finalized,
+      })
+
       await handleFinalize(blockchainId)
-      console.log("[v0] handleFinalize completed, refreshing data")
+
+      console.log("[v0] [CLIENT] handleFinalize completed, refreshing data")
       blockchainDataLoaded.current = false
       await refreshCampaignData()
-      console.log("[v0] Campaign data refreshed after finalization")
+      console.log("[v0] [CLIENT] Campaign data refreshed after finalization")
+
+      // Refresh again after 2 seconds to ensure blockchain state is updated
       setTimeout(async () => {
+        console.log("[v0] [CLIENT] Performing delayed refresh")
         blockchainDataLoaded.current = false
         await refreshCampaignData()
       }, 2000)
     } catch (error) {
-      console.error("[v0] Failed to finalize campaign:", error)
+      console.error("[v0] [CLIENT] Failed to finalize campaign:", error)
+      console.error("[v0] [CLIENT] Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      })
       toast.error(`Failed to finalize campaign: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
   const handleRefundClick = async () => {
+    console.log("[v0] [CLIENT] handleRefundClick called")
+    console.log("[v0] [CLIENT] Current state:", {
+      blockchainId,
+      userPledgeAmount: userPledgeAmount?.toString(),
+      hasClaimedRefund,
+      campaignStatus: campaign.status,
+    })
+
     if (!blockchainId) {
-      console.error("[v0] No blockchain campaign ID")
+      console.error("[v0] [CLIENT] No blockchain campaign ID - cannot refund")
+      toast.error("Cannot claim refund: Campaign not deployed to blockchain")
       return
     }
 
     const pledgeAmountInUsdc = Number(userPledgeAmount) / 1e6
+    console.log("[v0] [CLIENT] Pledge amount in USDC:", pledgeAmountInUsdc)
+
     const confirmed = window.confirm(
       `Are you sure you want to claim your refund of $${pledgeAmountInUsdc.toFixed(2)} USDC?`,
     )
 
+    console.log("[v0] [CLIENT] Confirmation result:", confirmed)
     if (!confirmed) {
+      console.log("[v0] [CLIENT] User cancelled refund")
       return
     }
 
     try {
+      console.log("[v0] [CLIENT] Calling handleRefund with campaignId:", blockchainId)
       await handleRefund(blockchainId)
+
+      console.log("[v0] [CLIENT] handleRefund completed, refreshing data")
       blockchainDataLoaded.current = false
       await refreshCampaignData()
+      console.log("[v0] [CLIENT] Campaign data refreshed after refund")
     } catch (error) {
-      console.error("[v0] Failed to refund:", error)
+      console.error("[v0] [CLIENT] Failed to refund:", error)
+      console.error("[v0] [CLIENT] Error details:", {
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      })
+      toast.error(`Failed to claim refund: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 

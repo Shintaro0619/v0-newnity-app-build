@@ -4,12 +4,15 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Globe, Calendar, Users, Target, Clock } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Globe, Calendar, Users, Target, Clock, Settings } from "lucide-react"
 import Link from "next/link"
+import { useAccount } from "wagmi"
 
 interface ProfilePageClientProps {
   userProfile: any
   campaigns: any[]
+  address: string
 }
 
 function getDaysLeft(endDate: string): number {
@@ -34,7 +37,39 @@ function getStatusBadgeVariant(status: string): "default" | "secondary" | "destr
   }
 }
 
-export function ProfilePageClient({ userProfile, campaigns }: ProfilePageClientProps) {
+export function ProfilePageClient({ userProfile, campaigns, address }: ProfilePageClientProps) {
+  const { address: connectedAddress } = useAccount()
+  const isOwnProfile = connectedAddress?.toLowerCase() === address.toLowerCase()
+
+  if (!userProfile) {
+    return (
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8 max-w-2xl">
+          <Card>
+            <CardContent className="text-center py-12">
+              <Avatar className="h-24 w-24 mx-auto mb-4">
+                <AvatarFallback className="text-2xl">{address.charAt(2).toUpperCase()}</AvatarFallback>
+              </Avatar>
+              <h2 className="text-2xl font-bold mb-2">Profile Not Set Up</h2>
+              <p className="text-muted-foreground mb-2">
+                {isOwnProfile ? "You haven't set up your profile yet." : "This user hasn't set up their profile yet."}
+              </p>
+              <p className="text-sm text-muted-foreground mb-6 font-mono break-all px-4">{address}</p>
+              {isOwnProfile && (
+                <Button asChild>
+                  <Link href="/settings">
+                    <Settings className="h-4 w-4 mr-2" />
+                    Set Up Profile
+                  </Link>
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   const totalRaised = campaigns.reduce((sum: number, c: any) => sum + Number(c.raised_amount || 0), 0)
 
   return (
@@ -43,19 +78,19 @@ export function ProfilePageClient({ userProfile, campaigns }: ProfilePageClientP
         {/* Profile Header */}
         <Card className="mb-8">
           <CardContent className="pt-6">
-            <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
-              <Avatar className="h-24 w-24">
+            <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
+              <Avatar className="h-24 w-24 flex-shrink-0">
                 <AvatarImage src={userProfile.avatar || "/placeholder.svg"} alt={userProfile.name} />
                 <AvatarFallback className="text-2xl">
                   {userProfile.name?.charAt(0) || userProfile.email?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
 
-              <div className="flex-1">
-                <h1 className="text-3xl font-bold mb-2">{userProfile.name || "Anonymous User"}</h1>
+              <div className="flex-1 text-center md:text-left w-full">
+                <h1 className="text-2xl md:text-3xl font-bold mb-2">{userProfile.name || "Anonymous User"}</h1>
                 <p className="text-muted-foreground mb-4">{userProfile.bio || "No bio yet"}</p>
 
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                <div className="flex flex-wrap justify-center md:justify-start gap-3 md:gap-4 text-sm text-muted-foreground">
                   {userProfile.website && (
                     <a
                       href={userProfile.website}
@@ -64,12 +99,13 @@ export function ProfilePageClient({ userProfile, campaigns }: ProfilePageClientP
                       className="flex items-center hover:text-primary transition-colors"
                     >
                       <Globe className="h-4 w-4 mr-1" />
-                      Website
+                      <span className="hidden sm:inline">Website</span>
                     </a>
                   )}
                   <span className="flex items-center">
                     <Calendar className="h-4 w-4 mr-1" />
-                    Joined {new Date(userProfile.created_at).toLocaleDateString()}
+                    <span className="hidden sm:inline">Joined </span>
+                    {new Date(userProfile.created_at).toLocaleDateString()}
                   </span>
                   <span className="flex items-center">
                     <Target className="h-4 w-4 mr-1" />
@@ -78,11 +114,19 @@ export function ProfilePageClient({ userProfile, campaigns }: ProfilePageClientP
                 </div>
               </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="text-right">
-                  <div className="text-2xl font-bold text-primary">${totalRaised.toLocaleString()}</div>
+              <div className="flex flex-col gap-3 w-full md:w-auto items-center md:items-end">
+                <div className="text-center md:text-right">
+                  <div className="text-2xl md:text-3xl font-bold text-primary">${totalRaised.toLocaleString()}</div>
                   <div className="text-sm text-muted-foreground">Total Raised</div>
                 </div>
+                {isOwnProfile && (
+                  <Button variant="outline" size="sm" asChild className="w-full md:w-auto bg-transparent">
+                    <Link href="/settings">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Edit Profile
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
           </CardContent>

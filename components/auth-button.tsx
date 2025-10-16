@@ -1,6 +1,7 @@
 "use client"
 
-import { useUser } from "@stackframe/stack"
+import { useAccount } from "wagmi"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
@@ -10,67 +11,79 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { User, Settings, LogOut } from "lucide-react"
+import { User, LayoutDashboard, Settings } from "lucide-react"
 import Link from "next/link"
+import { getUserProfile } from "@/app/settings/actions"
 
 export function AuthButton() {
-  const user = useUser()
+  const { address, isConnected } = useAccount()
+  const [userProfile, setUserProfile] = useState<any>(null)
 
-  if (!user) {
-    return (
-      <div className="flex gap-2">
-        <Button variant="ghost" asChild>
-          <Link href="/handler/signin">Sign In</Link>
-        </Button>
-        <Button asChild>
-          <Link href="/handler/signup">Sign Up</Link>
-        </Button>
-      </div>
-    )
+  useEffect(() => {
+    async function loadProfile() {
+      if (address && isConnected) {
+        try {
+          const data = await getUserProfile(address)
+          if (data.profile) {
+            setUserProfile(data.profile)
+          }
+        } catch (error) {
+          console.error("Error loading profile:", error)
+        }
+      }
+    }
+    loadProfile()
+  }, [address, isConnected])
+
+  if (!isConnected || !address) {
+    return null
   }
+
+  const displayName = `${address.slice(0, 6)}...${address.slice(-4)}`
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" className="relative h-8 w-8 rounded-full">
           <Avatar className="h-8 w-8">
-            <AvatarImage src={user.profileImageUrl || ""} alt={user.displayName || ""} />
-            <AvatarFallback>{user.displayName?.charAt(0) || user.primaryEmail?.charAt(0) || "U"}</AvatarFallback>
+            <AvatarImage src={userProfile?.avatar || "/placeholder.svg"} alt={userProfile?.name || displayName} />
+            <AvatarFallback className="bg-primary/20 text-primary">
+              {userProfile?.name?.charAt(0).toUpperCase() || displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56" align="end" forceMount>
+      <DropdownMenuContent className="w-56 bg-gray-900 border-gray-700" align="end" forceMount>
         <div className="flex items-center justify-start gap-2 p-2">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={userProfile?.avatar || "/placeholder.svg"} alt={userProfile?.name || displayName} />
+            <AvatarFallback className="bg-primary/20 text-primary">
+              {userProfile?.name?.charAt(0).toUpperCase() || displayName.charAt(0).toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
           <div className="flex flex-col space-y-1 leading-none">
-            {user.displayName && <p className="font-medium">{user.displayName}</p>}
-            {user.primaryEmail && (
-              <p className="w-[200px] truncate text-sm text-muted-foreground">{user.primaryEmail}</p>
-            )}
+            <p className="font-medium text-white">{userProfile?.name || displayName}</p>
+            <p className="w-[160px] truncate text-xs text-gray-400">{address}</p>
           </div>
         </div>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link href="/profile/settings" className="flex items-center">
+        <DropdownMenuSeparator className="bg-gray-700" />
+        <DropdownMenuItem asChild className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer">
+          <Link href={`/profile/${address}`} className="flex items-center">
             <User className="mr-2 h-4 w-4" />
-            Profile
+            View Profile
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem asChild>
+        <DropdownMenuItem asChild className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer">
+          <Link href="/settings" className="flex items-center">
+            <Settings className="mr-2 h-4 w-4" />
+            Edit Profile
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer">
           <Link href="/dashboard" className="flex items-center">
-            <User className="mr-2 h-4 w-4" />
+            <LayoutDashboard className="mr-2 h-4 w-4" />
             Dashboard
           </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <Link href="/handler/account-settings" className="flex items-center">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem className="flex items-center" onClick={() => user.signOut()}>
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

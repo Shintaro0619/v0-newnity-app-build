@@ -15,7 +15,7 @@ import { RichEditor } from "@/components/ui/rich-editor"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Alert } from "@/components/ui/alert"
 import { format } from "date-fns"
 import Link from "next/link"
 import dynamic from "next/dynamic"
@@ -53,6 +53,7 @@ interface CampaignData {
     prelaunch: boolean
     notifications: boolean
   }
+  milestones?: Milestone[] // Added milestones to CampaignData interface
 }
 
 interface RewardTier {
@@ -100,6 +101,7 @@ const initialCampaignData: CampaignData = {
     prelaunch: false,
     notifications: true,
   },
+  milestones: [], // Initialize milestones
 }
 
 const categories = [
@@ -434,6 +436,13 @@ export default function CreateCampaignPage() {
       }
     }
 
+    // Add validation for milestones if they are considered mandatory for the step
+    // if (step === 5) { // Assuming milestones are part of step 5
+    //   if (!campaignData.milestones || campaignData.milestones.length === 0) {
+    //     newErrors.milestones = "At least one milestone is required";
+    //   }
+    // }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -455,6 +464,10 @@ export default function CreateCampaignPage() {
     if (campaignData.rewards.length === 0) {
       allErrors.rewards = "At least one reward tier is required"
     }
+    // Add validation for milestones in the final submission
+    if (!campaignData.milestones || campaignData.milestones.length === 0) {
+      allErrors.milestones = "At least one milestone is required"
+    }
 
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors)
@@ -463,6 +476,7 @@ export default function CreateCampaignPage() {
       else if (allErrors.mainImage) setActiveTab("media")
       else if (allErrors.goal || allErrors.endDate) setActiveTab("funding")
       else if (allErrors.rewards) setActiveTab("tiers")
+      else if (allErrors.milestones) setActiveTab("milestones") // Set active tab for milestones
       return
     }
 
@@ -494,6 +508,10 @@ export default function CreateCampaignPage() {
             ...reward,
             deliveryDate: reward.deliveryDate ? reward.deliveryDate.toISOString() : "",
           })),
+          milestones: campaignData.milestones?.map((milestone) => ({
+            ...milestone,
+            targetDate: milestone.targetDate ? milestone.targetDate.toISOString() : "",
+          })), // Include milestones in JSON data
           creatorAddress: address,
         }),
       )
@@ -604,13 +622,11 @@ export default function CreateCampaignPage() {
           {/* Wallet Connection Alert */}
           {!isConnected && (
             <Alert>
-              <span className="text-lg">👛</span>
-              <AlertDescription>
-                <div className="space-y-3">
-                  <p>
-                    <strong>Wallet Connection Required</strong>
-                  </p>
-                  <p className="text-sm">
+              <div className="flex items-center gap-3 col-span-2">
+                <span className="text-lg flex-shrink-0">👛</span>
+                <div className="flex-1">
+                  <p className="font-semibold mb-2">Wallet Connection Required</p>
+                  <p className="text-sm mb-2">
                     To create your campaign, you'll need to connect your wallet. This allows you to deploy your campaign
                     to the blockchain and receive funds.
                   </p>
@@ -618,23 +634,21 @@ export default function CreateCampaignPage() {
                     Please use the "Connect Wallet" button in the header to connect your wallet.
                   </p>
                 </div>
-              </AlertDescription>
+              </div>
             </Alert>
           )}
 
           {isConnected && address && (
             <Alert>
-              <span className="text-lg">✅</span>
-              <AlertDescription>
-                <div className="space-y-2">
-                  <p>
-                    <strong>Wallet Connected</strong>
-                  </p>
+              <div className="flex items-center gap-3 col-span-2">
+                <span className="text-lg flex-shrink-0">✅</span>
+                <div className="flex-1">
+                  <p className="font-semibold mb-1">Wallet Connected</p>
                   <p className="text-sm font-mono">
                     {address.slice(0, 6)}...{address.slice(-4)}
                   </p>
                 </div>
-              </AlertDescription>
+              </div>
             </Alert>
           )}
 
@@ -647,6 +661,7 @@ export default function CreateCampaignPage() {
                   <TabsTrigger value="media">Media</TabsTrigger>
                   <TabsTrigger value="funding">Funding</TabsTrigger>
                   <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
+                  <TabsTrigger value="milestones">Milestones</TabsTrigger> {/* Added Milestones Tab Trigger */}
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-6">
@@ -773,11 +788,13 @@ export default function CreateCampaignPage() {
                     </CardHeader>
                     <CardContent className="space-y-8">
                       <Alert>
-                        <span className="text-lg">ℹ️</span>
-                        <AlertDescription>
-                          High-quality images and videos significantly increase campaign success rates. Make sure your
-                          media clearly shows your product or project.
-                        </AlertDescription>
+                        <div className="flex items-center gap-3 col-span-2">
+                          <span className="text-lg flex-shrink-0">ℹ️</span>
+                          <p className="text-sm flex-1">
+                            High-quality images and videos significantly increase campaign success rates. Make sure your
+                            media clearly shows your product or project.
+                          </p>
+                        </div>
                       </Alert>
 
                       <MediaUpload
@@ -992,11 +1009,13 @@ export default function CreateCampaignPage() {
                       </div>
 
                       <Alert>
-                        <span className="text-lg">⚠️</span>
-                        <AlertDescription>
-                          Remember: This is an all-or-nothing funding model. You only receive funds if you reach your
-                          goal by the deadline.
-                        </AlertDescription>
+                        <div className="flex items-center gap-3 col-span-2">
+                          <span className="text-lg flex-shrink-0">⚠️</span>
+                          <p className="text-sm flex-1">
+                            Remember: This is an all-or-nothing funding model. You only receive funds if you reach your
+                            goal by the deadline.
+                          </p>
+                        </div>
                       </Alert>
                     </CardContent>
                   </Card>
@@ -1022,8 +1041,10 @@ export default function CreateCampaignPage() {
                     <CardContent className="space-y-6">
                       {errors.rewards && (
                         <Alert>
-                          <span className="text-lg">⚠️</span>
-                          <AlertDescription>{errors.rewards}</AlertDescription>
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0">⚠️</span>
+                            <p className="text-sm flex-1 min-w-0">{errors.rewards}</p>
+                          </div>
                         </Alert>
                       )}
 
@@ -1076,6 +1097,14 @@ export default function CreateCampaignPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="space-y-6">
+                      {errors.milestones && (
+                        <Alert>
+                          <div className="flex items-start gap-3">
+                            <span className="text-lg flex-shrink-0">⚠️</span>
+                            <p className="text-sm flex-1 min-w-0">{errors.milestones}</p>
+                          </div>
+                        </Alert>
+                      )}
                       {campaignData.milestones?.map((milestone, index) => (
                         <MilestoneCard
                           key={milestone.id}
@@ -1175,11 +1204,13 @@ export default function CreateCampaignPage() {
               </Card>
 
               <Alert>
-                <span className="text-lg">💡</span>
-                <AlertDescription>
-                  <strong>Tip:</strong> Complete all required sections before creating your campaign. You can always
-                  edit it later from your dashboard.
-                </AlertDescription>
+                <div className="flex items-center gap-3 col-span-2">
+                  <span className="text-lg flex-shrink-0">💡</span>
+                  <p className="text-sm flex-1">
+                    <strong>Tip:</strong> Complete all required sections before creating your campaign. You can always
+                    edit it later from your dashboard.
+                  </p>
+                </div>
               </Alert>
             </div>
           </div>
