@@ -59,7 +59,7 @@
 - `pledges`: mapping(uint256 => mapping(address => uint256)) - Pledge tracking
 
 **Key Structs**:
-```solidity
+\`\`\`solidity
 struct Campaign {
     address creator;
     uint256 goal;
