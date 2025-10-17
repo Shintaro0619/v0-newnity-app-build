@@ -26,7 +26,7 @@ function getStatusBadgeVariant(status: string): "default" | "secondary" | "destr
   switch (status) {
     case "ACTIVE":
       return "default"
-    case "FUNDED":
+    case "SUCCESSFUL":
       return "default"
     case "FAILED":
       return "destructive"

@@ -1,15 +1,29 @@
 import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
-import { injected, walletConnect } from "wagmi/connectors"
+import { injected } from "wagmi/connectors"
+
+// WalletConnect's heartbeat feature causes "Cannot read properties of undefined (reading 'apply')" errors
+// in the browser environment. Using injected connectors (MetaMask, etc.) only for now.
+
+if (typeof window !== "undefined") {
+  // Polyfill process object for any remaining dependencies
+  if (typeof (window as any).process === "undefined") {
+    ;(window as any).process = {
+      env: {},
+      version: "v18.0.0",
+      versions: {},
+      platform: "browser",
+      nextTick: (callback: Function, ...args: any[]) => {
+        setTimeout(() => callback(...args), 0)
+      },
+      emitWarning: function emitWarning(...args: any[]) {
+        return undefined
+      },
+    }
+  }
+}
 
 const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || ""
-
-const getMetadataUrl = () => {
-  if (typeof window !== "undefined") {
-    return window.location.origin
-  }
-  return "https://newnity.app"
-}
 
 let configInstance: ReturnType<typeof createConfig> | null = null
 
@@ -20,35 +34,11 @@ export const config = (() => {
   }
 
   console.log("[v0] Creating new wagmi config instance")
-  console.log("[v0] WalletConnect Project ID:", projectId ? "✓ Present" : "✗ Missing")
+  console.log("[v0] WalletConnect Project ID:", projectId ? "✓ Present (disabled)" : "✗ Missing")
 
   const connectors = [injected()]
   console.log("[v0] Added injected connector")
-
-  if (projectId) {
-    try {
-      const wcConnector = walletConnect({
-        projectId,
-        metadata: {
-          name: "Newnity",
-          description: "Decentralized crowdfunding platform on Base",
-          url: getMetadataUrl(),
-          icons: [`${getMetadataUrl()}/icon.png`],
-        },
-        showQrModal: true,
-        qrModalOptions: {
-          themeMode: "dark",
-        },
-      })
-      connectors.push(wcConnector)
-      console.log("[v0] Added WalletConnect connector successfully")
-    } catch (error) {
-      console.warn("[v0] Failed to initialize WalletConnect:", error)
-      console.warn("[v0] Using injected connector only")
-    }
-  } else {
-    console.warn("[v0] WalletConnect Project ID not found, using injected connector only")
-  }
+  console.log("[v0] Note: WalletConnect is temporarily disabled to prevent EventEmitter errors")
 
   configInstance = createConfig({
     chains: [baseSepolia, base],
@@ -59,7 +49,7 @@ export const config = (() => {
     },
   })
 
-  console.log("[v0] Wagmi config created with", connectors.length, "connectors")
+  console.log("[v0] Wagmi config created with", connectors.length, "connector(s)")
 
   return configInstance
 })()

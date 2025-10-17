@@ -33,7 +33,7 @@ const CATEGORIES = [
 const STATUSES = [
   { value: "all", label: "All Status" },
   { value: "ACTIVE", label: "Active" },
-  { value: "FUNDED", label: "Funded" },
+  { value: "SUCCESSFUL", label: "Successful" },
   { value: "FAILED", label: "Failed" },
 ]
 

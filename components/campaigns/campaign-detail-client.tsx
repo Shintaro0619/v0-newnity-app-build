@@ -11,7 +11,7 @@ import { useAccount } from "wagmi"
 import { PledgeModalV2 } from "@/components/pledge-modal-v2"
 import { DeployCampaignButton } from "@/components/campaigns/deploy-campaign-button"
 import { formatUnits } from "viem"
-import { getCampaignById, savePledgeToDatabase } from "@/lib/actions/campaigns"
+import { getCampaignById, savePledgeToDatabase, updateCampaignBlockchainData } from "@/lib/actions/campaigns"
 import { formatDeadline, isDeadlinePassed } from "@/lib/utils/date-utils"
 import { toast } from "react-toastify"
 
@@ -23,7 +23,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   const [campaign, setCampaign] = useState(initialCampaign)
   const [showPledgeModal, setShowPledgeModal] = useState(false)
   const [selectedGalleryIndex, setSelectedGalleryIndex] = useState(0)
-  const blockchainDataLoaded = useRef(false)
+  const syncAttempted = useRef(false)
   const [blockchainFunding, setBlockchainFunding] = useState<{
     raised: number
     goal: number
@@ -53,7 +53,11 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       const updatedCampaign = await getCampaignById(campaign.id)
       if (updatedCampaign) {
         setCampaign(updatedCampaign)
-        console.log("[v0] Campaign data refreshed:", updatedCampaign)
+        console.log("[v0] Campaign data refreshed:", {
+          id: updatedCampaign.id,
+          status: updatedCampaign.status,
+          raised_amount: updatedCampaign.raised_amount,
+        })
       }
     } catch (error) {
       console.error("[v0] Failed to refresh campaign data:", error)
@@ -61,71 +65,88 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   }
 
   useEffect(() => {
-    if (!blockchainId || !campaignData || blockchainDataLoaded.current) {
-      console.log("[v0] No blockchain campaign ID or data available or already loaded")
+    if (!blockchainId || !campaignData || syncAttempted.current) {
+      console.log("[v0] Skipping blockchain sync:", {
+        hasBlockchainId: !!blockchainId,
+        hasCampaignData: !!campaignData,
+        syncAttempted: syncAttempted.current,
+      })
       return
     }
 
-    try {
-      console.log("[v0] Blockchain data loaded:", {
-        finalized: campaignData.finalized,
-        successful: campaignData.successful,
-        totalPledged: campaignData.totalPledged?.toString(),
-        goal: campaignData.goal?.toString(),
-        deadline: campaignData.deadline?.toString(),
-        creator: campaignData.creator,
-      })
+    const syncBlockchainStatus = async () => {
+      try {
+        console.log("[v0] Starting blockchain data sync")
+        console.log("[v0] Blockchain data loaded:", {
+          finalized: campaignData.finalized,
+          successful: campaignData.successful,
+          totalPledged: campaignData.totalPledged?.toString(),
+          goal: campaignData.goal?.toString(),
+          deadline: campaignData.deadline?.toString(),
+          creator: campaignData.creator,
+        })
 
-      const raisedBigInt = campaignData.totalPledged
-      const goalBigInt = campaignData.goal
-      const deadlineBigInt = campaignData.deadline
+        const raisedBigInt = campaignData.totalPledged
+        const goalBigInt = campaignData.goal
+        const deadlineBigInt = campaignData.deadline
 
-      if (!raisedBigInt || !goalBigInt || !deadlineBigInt) {
-        return
+        if (raisedBigInt === undefined || goalBigInt === undefined || deadlineBigInt === undefined) {
+          console.log("[v0] Missing blockchain data (undefined), skipping sync")
+          syncAttempted.current = true
+          return
+        }
+
+        const raised = Number(formatUnits(raisedBigInt, 6))
+        const goal = Number(formatUnits(goalBigInt, 6))
+
+        setBlockchainFunding({
+          raised,
+          goal,
+          backers: 0,
+        })
+
+        console.log("[v0] Checking if status update is needed:", {
+          isFinalized: campaignData.finalized,
+          currentStatus: campaign.status,
+          shouldUpdate: campaignData.finalized && (campaign.status === "ACTIVE" || campaign.status === "DRAFT"),
+        })
+
+        if (campaignData.finalized && (campaign.status === "ACTIVE" || campaign.status === "DRAFT")) {
+          const newStatus = campaignData.successful ? "SUCCESSFUL" : "FAILED"
+          console.log("[v0] Campaign is finalized on blockchain, updating database status to:", newStatus)
+
+          syncAttempted.current = true
+
+          try {
+            const result = await updateCampaignBlockchainData(campaign.id, {
+              blockchain_campaign_id: blockchainId,
+              status: newStatus,
+              raised_amount: raised,
+            })
+
+            console.log("[v0] Database status updated successfully:", result)
+
+            await refreshCampaignData()
+            console.log("[v0] Campaign data refreshed after status update")
+          } catch (updateError) {
+            console.error("[v0] Failed to update campaign blockchain data:", updateError)
+            syncAttempted.current = false
+          }
+        } else {
+          syncAttempted.current = true
+          console.log("[v0] Blockchain data sync completed (no status update needed)")
+        }
+      } catch (error) {
+        console.error("[v0] Failed to sync blockchain status:", error)
+        syncAttempted.current = false
       }
-
-      const raised = Number(formatUnits(raisedBigInt, 6))
-      const goal = Number(formatUnits(goalBigInt, 6))
-      const daysLeft = Math.max(0, Math.floor((Number(deadlineBigInt) - Date.now() / 1000) / 86400))
-
-      setBlockchainFunding({
-        raised,
-        goal,
-        backers: 0,
-      })
-
-      if (campaignData.finalized) {
-        const newStatus = campaignData.successful ? "FUNDED" : "FAILED"
-        setCampaign((prev: any) => ({
-          ...prev,
-          goal_amount: goal,
-          daysLeft,
-          status: newStatus,
-        }))
-      } else {
-        setCampaign((prev: any) => ({
-          ...prev,
-          goal_amount: goal,
-          daysLeft,
-          status: "ACTIVE",
-        }))
-      }
-
-      blockchainDataLoaded.current = true
-    } catch (error) {
-      console.error("[v0] Failed to load blockchain data:", error)
     }
-  }, [campaignData, blockchainId])
+
+    syncBlockchainStatus()
+  }, [campaignData, blockchainId, campaign.id])
 
   const handleFinalizeClick = async () => {
     console.log("[v0] [CLIENT] handleFinalizeClick called")
-    console.log("[v0] [CLIENT] Current state:", {
-      blockchainId,
-      campaignStatus: campaign.status,
-      isCreator,
-      hasDeadlinePassed,
-      isBlockchainFinalized,
-    })
 
     if (!blockchainId) {
       console.error("[v0] [CLIENT] No blockchain campaign ID - cannot finalize")
@@ -133,14 +154,12 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       return
     }
 
-    console.log("[v0] [CLIENT] Showing confirmation dialog")
     const confirmed = window.confirm(
       "Are you sure you want to finalize this campaign? This action cannot be undone. " +
         "If the campaign reached its goal, funds will be released to you. " +
         "If not, backers will be able to claim refunds.",
     )
 
-    console.log("[v0] [CLIENT] Confirmation result:", confirmed)
     if (!confirmed) {
       console.log("[v0] [CLIENT] User cancelled finalization")
       return
@@ -148,44 +167,26 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
 
     try {
       console.log("[v0] [CLIENT] Calling handleFinalize with campaignId:", blockchainId)
-      console.log("[v0] [CLIENT] Campaign data before finalize:", {
-        totalPledged: campaignData?.totalPledged?.toString(),
-        goal: campaignData?.goal?.toString(),
-        deadline: campaignData?.deadline?.toString(),
-        finalized: campaignData?.finalized,
-      })
-
       await handleFinalize(blockchainId)
 
       console.log("[v0] [CLIENT] handleFinalize completed, refreshing data")
-      blockchainDataLoaded.current = false
+      syncAttempted.current = false
       await refreshCampaignData()
       console.log("[v0] [CLIENT] Campaign data refreshed after finalization")
 
-      // Refresh again after 2 seconds to ensure blockchain state is updated
       setTimeout(async () => {
         console.log("[v0] [CLIENT] Performing delayed refresh")
-        blockchainDataLoaded.current = false
+        syncAttempted.current = false
         await refreshCampaignData()
       }, 2000)
     } catch (error) {
       console.error("[v0] [CLIENT] Failed to finalize campaign:", error)
-      console.error("[v0] [CLIENT] Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-      })
       toast.error(`Failed to finalize campaign: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
   const handleRefundClick = async () => {
     console.log("[v0] [CLIENT] handleRefundClick called")
-    console.log("[v0] [CLIENT] Current state:", {
-      blockchainId,
-      userPledgeAmount: userPledgeAmount?.toString(),
-      hasClaimedRefund,
-      campaignStatus: campaign.status,
-    })
 
     if (!blockchainId) {
       console.error("[v0] [CLIENT] No blockchain campaign ID - cannot refund")
@@ -194,13 +195,11 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     const pledgeAmountInUsdc = Number(userPledgeAmount) / 1e6
-    console.log("[v0] [CLIENT] Pledge amount in USDC:", pledgeAmountInUsdc)
 
     const confirmed = window.confirm(
       `Are you sure you want to claim your refund of $${pledgeAmountInUsdc.toFixed(2)} USDC?`,
     )
 
-    console.log("[v0] [CLIENT] Confirmation result:", confirmed)
     if (!confirmed) {
       console.log("[v0] [CLIENT] User cancelled refund")
       return
@@ -211,15 +210,10 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       await handleRefund(blockchainId)
 
       console.log("[v0] [CLIENT] handleRefund completed, refreshing data")
-      blockchainDataLoaded.current = false
       await refreshCampaignData()
       console.log("[v0] [CLIENT] Campaign data refreshed after refund")
     } catch (error) {
       console.error("[v0] [CLIENT] Failed to refund:", error)
-      console.error("[v0] [CLIENT] Error details:", {
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-      })
       toast.error(`Failed to claim refund: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
@@ -234,13 +228,6 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
 
     if (campaign.id && pledgeData) {
       try {
-        console.log("[v0] Saving pledge to database:", {
-          campaignId: campaign.id,
-          amount: pledgeData.amount,
-          backerAddress: pledgeData.backerAddress,
-          transactionHash: pledgeData.hash,
-        })
-
         const amountNumber = Number.parseFloat(pledgeData.amount)
 
         await savePledgeToDatabase({
@@ -257,7 +244,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       }
     }
 
-    blockchainDataLoaded.current = false
+    syncAttempted.current = false
     await refreshCampaignData()
   }
 
@@ -286,7 +273,6 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   const getYouTubeEmbedUrl = (url: string | null) => {
     if (!url) return null
 
-    // Handle various YouTube URL formats
     const patterns = [
       /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
       /youtube\.com\/shorts\/([^&\n?#]+)/,
@@ -373,7 +359,6 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   <CardTitle>Gallery</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Main selected image */}
                   <div className="aspect-video bg-muted rounded-lg overflow-hidden">
                     <img
                       src={campaign.gallery[selectedGalleryIndex] || "/placeholder.svg"}
@@ -382,7 +367,6 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                     />
                   </div>
 
-                  {/* Thumbnail grid */}
                   {campaign.gallery.length > 1 && (
                     <div className="grid grid-cols-4 gap-2">
                       {campaign.gallery.map((imageUrl: string, index: number) => (
@@ -546,7 +530,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   </div>
                 )}
 
-                {isCreator && campaign.status === "FUNDED" && (
+                {isCreator && campaign.status === "SUCCESSFUL" && (
                   <div className="space-y-2">
                     <div className="p-3 bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg text-sm">
                       <p className="font-medium text-green-900 dark:text-green-100 mb-1">✅ Campaign Successful!</p>

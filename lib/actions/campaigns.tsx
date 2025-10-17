@@ -401,47 +401,134 @@ export async function updateCampaignBlockchainData(
   },
 ) {
   try {
-    const updates: string[] = []
+    console.log("[v0] [SERVER ACTION] updateCampaignBlockchainData called with:", {
+      campaignId,
+      data,
+    })
 
-    if (data.blockchain_campaign_id !== undefined) {
-      updates.push(`blockchain_campaign_id = ${data.blockchain_campaign_id}`)
-    }
-
-    if (data.contract_tx_hash) {
-      updates.push(`contract_tx_hash = '${data.contract_tx_hash}'`)
-    }
-
-    if (data.escrow_address) {
-      updates.push(`escrow_address = '${data.escrow_address}'`)
-    }
-
-    if (data.raised_amount !== undefined) {
-      updates.push(`raised_amount = ${data.raised_amount}`)
-    }
+    let result
 
     if (data.status) {
-      updates.push(`status = '${data.status}'`)
+      console.log("[v0] [SERVER ACTION] Updating status to:", data.status)
+
+      if (data.blockchain_campaign_id !== undefined && data.raised_amount !== undefined) {
+        // Update status, blockchain_campaign_id, and raised_amount
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            status = ${data.status},
+            blockchain_campaign_id = ${data.blockchain_campaign_id},
+            raised_amount = ${data.raised_amount},
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, updated_at
+        `
+      } else if (data.blockchain_campaign_id !== undefined) {
+        // Update status and blockchain_campaign_id
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            status = ${data.status},
+            blockchain_campaign_id = ${data.blockchain_campaign_id},
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, updated_at
+        `
+      } else if (data.raised_amount !== undefined) {
+        // Update status and raised_amount
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            status = ${data.status},
+            raised_amount = ${data.raised_amount},
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, updated_at
+        `
+      } else {
+        // Update status only
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            status = ${data.status},
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, updated_at
+        `
+      }
+
+      if (data.status === "ACTIVE") {
+        console.log("[v0] [SERVER ACTION] Updating start_date to current time")
+        await sql`
+          UPDATE campaigns 
+          SET start_date = NOW()
+          WHERE id = ${campaignId}
+        `
+      }
+    } else if (data.blockchain_campaign_id !== undefined || data.contract_tx_hash) {
+      console.log("[v0] [SERVER ACTION] Blockchain deployment detected, setting status to ACTIVE")
+
+      if (data.blockchain_campaign_id !== undefined && data.contract_tx_hash && data.escrow_address) {
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            blockchain_campaign_id = ${data.blockchain_campaign_id},
+            contract_tx_hash = ${data.contract_tx_hash},
+            escrow_address = ${data.escrow_address},
+            status = 'ACTIVE',
+            start_date = NOW(),
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, start_date, updated_at
+        `
+      } else if (data.blockchain_campaign_id !== undefined) {
+        result = await sql`
+          UPDATE campaigns 
+          SET 
+            blockchain_campaign_id = ${data.blockchain_campaign_id},
+            status = 'ACTIVE',
+            start_date = NOW(),
+            updated_at = NOW()
+          WHERE id = ${campaignId}
+          RETURNING id, status, raised_amount, blockchain_campaign_id, start_date, updated_at
+        `
+      }
+    } else if (data.raised_amount !== undefined) {
+      result = await sql`
+        UPDATE campaigns 
+        SET 
+          raised_amount = ${data.raised_amount},
+          updated_at = NOW()
+        WHERE id = ${campaignId}
+        RETURNING id, status, raised_amount, blockchain_campaign_id, updated_at
+      `
+    } else {
+      console.log("[v0] [SERVER ACTION] No updates to perform")
+      return null
     }
 
-    if ((data.blockchain_campaign_id !== undefined || data.contract_tx_hash) && !data.status) {
-      updates.push(`status = 'ACTIVE'`)
+    if (!result || result.length === 0) {
+      console.error("[v0] [SERVER ACTION] No campaign found with ID:", campaignId)
+      return null
     }
 
-    updates.push(`updated_at = NOW()`)
+    console.log("[v0] [SERVER ACTION] Campaign updated successfully:", {
+      id: result[0]?.id,
+      status: result[0]?.status,
+      raised_amount: result[0]?.raised_amount,
+      blockchain_campaign_id: result[0]?.blockchain_campaign_id,
+      updated_at: result[0]?.updated_at,
+    })
 
-    const setClause = updates.join(", ")
-
-    const result = await sql`
-      UPDATE campaigns 
-      SET ${sql.unsafe(setClause)}
-      WHERE id = ${campaignId}
-      RETURNING *
-    `
-
-    console.log("[v0] Campaign updated with blockchain data:", result[0])
     return result[0]
   } catch (error) {
-    console.error("[v0] Error updating campaign blockchain data:", error)
+    console.error("[v0] [SERVER ACTION] Error updating campaign blockchain data:", error)
+    console.error("[v0] [SERVER ACTION] Error details:", {
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : undefined,
+      campaignId,
+      data,
+    })
     throw error
   }
 }
@@ -622,7 +709,7 @@ export async function finalizeCampaignInDatabase(data: {
       totalAmount: data.totalAmount,
     })
 
-    const status = data.successful ? "FUNDED" : "FAILED"
+    const status = data.successful ? "SUCCESSFUL" : "FAILED"
     console.log("[v0] [SERVER ACTION] Setting campaign status to:", status)
 
     const result = await sql`
@@ -688,7 +775,7 @@ export async function saveRefundToDatabase(data: {
         status = 'FAILED',
         updated_at = NOW()
       WHERE id = ${data.campaignId}
-        AND status != 'FUNDED'
+        AND status != 'SUCCESSFUL'
       RETURNING *
     `
 
@@ -727,7 +814,7 @@ export async function saveFundsReleaseToDatabase(data: {
     const result = await sql`
       UPDATE campaigns
       SET 
-        status = 'FUNDED',
+        status = 'SUCCESSFUL',
         raised_amount = ${data.totalAmount},
         updated_at = NOW()
       WHERE id = ${data.campaignId}

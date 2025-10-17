@@ -42,20 +42,15 @@ export default function RootLayout({
                   if (typeof window.process === 'undefined') {
                     window.process = {
                       env: {},
-                      version: '',
+                      version: 'v18.0.0',
                       versions: {},
-                      emitWarning: function(warning, type, code) {
-                        // Silently ignore warnings
-                      },
-                      nextTick: function(callback) {
-                        setTimeout(callback, 0);
-                      }
+                      platform: 'browser',
+                      emitWarning: function() { return undefined; },
+                      nextTick: function(callback) { setTimeout(callback, 0); }
                     };
                   } else {
                     if (typeof window.process.emitWarning !== 'function') {
-                      window.process.emitWarning = function(warning, type, code) {
-                        // Silently ignore warnings
-                      };
+                      window.process.emitWarning = function() { return undefined; };
                     }
                   }
                   
@@ -64,17 +59,23 @@ export default function RootLayout({
                     window.global = window;
                   }
                   
-                  // Suppress WalletConnect errors globally
+                  // Suppress console errors
                   var originalError = console.error;
                   console.error = function() {
                     var args = Array.prototype.slice.call(arguments);
-                    var errorString = String(args[0]);
+                    var errorString = String(args[0] || '');
+                    var errorStack = (args[0] && args[0].stack) || '';
                     
                     if (
                       errorString.includes('process.emitWarning') ||
                       errorString.includes('walletconnect') ||
                       errorString.includes('heartbeat') ||
-                      errorString.includes('Cannot read properties of undefined')
+                      errorString.includes('Cannot read properties of undefined') ||
+                      errorString.includes('reading \\'apply\\'') ||
+                      errorString.includes('.apply') ||
+                      errorStack.includes('walletconnect') ||
+                      errorStack.includes('heartbeat') ||
+                      errorStack.includes('pino')
                     ) {
                       return;
                     }
@@ -82,23 +83,50 @@ export default function RootLayout({
                     originalError.apply(console, args);
                   };
                   
-                  // Global error handler
+                  // Global error handler - capture phase
                   window.addEventListener('error', function(event) {
                     var message = event.message || '';
                     var stack = (event.error && event.error.stack) || '';
+                    var filename = event.filename || '';
                     
                     if (
                       message.includes('Cannot read properties of undefined') ||
+                      message.includes('reading \\'apply\\'') ||
+                      message.includes('.apply') ||
                       message.includes('process.emitWarning') ||
                       stack.includes('walletconnect') ||
                       stack.includes('heartbeat') ||
-                      stack.includes('pino')
+                      stack.includes('pino') ||
+                      stack.includes('_.emit') ||
+                      stack.includes('i.pulse') ||
+                      filename.includes('walletconnect') ||
+                      filename.includes('heartbeat')
                     ) {
                       event.preventDefault();
                       event.stopPropagation();
+                      event.stopImmediatePropagation();
                       return false;
                     }
                   }, true);
+                  
+                  // Unhandled promise rejection handler
+                  window.addEventListener('unhandledrejection', function(event) {
+                    var reason = String(event.reason || '');
+                    var stack = (event.reason && event.reason.stack) || '';
+                    
+                    if (
+                      reason.includes('walletconnect') ||
+                      reason.includes('heartbeat') ||
+                      reason.includes('pulse.walletconnect.org') ||
+                      reason.includes('Cannot read properties of undefined') ||
+                      reason.includes('.apply') ||
+                      stack.includes('walletconnect') ||
+                      stack.includes('heartbeat')
+                    ) {
+                      event.preventDefault();
+                      return false;
+                    }
+                  });
                 }
               })();
             `,

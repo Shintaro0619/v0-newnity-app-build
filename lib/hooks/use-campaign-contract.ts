@@ -1,6 +1,13 @@
 "use client"
 
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, usePublicClient } from "wagmi"
+import {
+  useAccount,
+  useReadContract,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+  usePublicClient,
+  useChainId,
+} from "wagmi"
 import { parseUnits, decodeEventLog } from "viem"
 import { toast } from "sonner"
 import { CAMPAIGN_ESCROW_ABI } from "@/lib/contracts/campaign-escrow-abi"
@@ -11,7 +18,10 @@ import { savePledgeToDatabase } from "@/lib/actions/campaigns"
 import { useEffect } from "react"
 
 export function useCampaignContract(campaignId?: number) {
-  const { address, chainId = baseSepolia.id } = useAccount()
+  const { address } = useAccount()
+  const currentChainId = useChainId()
+
+  const chainId = baseSepolia.id
   const escrowAddress = getContractAddress(chainId, "campaignEscrow")
   const usdcAddress = getContractAddress(chainId, "usdc")
   const publicClient = usePublicClient()

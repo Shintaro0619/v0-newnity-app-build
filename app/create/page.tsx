@@ -436,13 +436,6 @@ export default function CreateCampaignPage() {
       }
     }
 
-    // Add validation for milestones if they are considered mandatory for the step
-    // if (step === 5) { // Assuming milestones are part of step 5
-    //   if (!campaignData.milestones || campaignData.milestones.length === 0) {
-    //     newErrors.milestones = "At least one milestone is required";
-    //   }
-    // }
-
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -464,10 +457,6 @@ export default function CreateCampaignPage() {
     if (campaignData.rewards.length === 0) {
       allErrors.rewards = "At least one reward tier is required"
     }
-    // Add validation for milestones in the final submission
-    if (!campaignData.milestones || campaignData.milestones.length === 0) {
-      allErrors.milestones = "At least one milestone is required"
-    }
 
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors)
@@ -476,7 +465,6 @@ export default function CreateCampaignPage() {
       else if (allErrors.mainImage) setActiveTab("media")
       else if (allErrors.goal || allErrors.endDate) setActiveTab("funding")
       else if (allErrors.rewards) setActiveTab("tiers")
-      else if (allErrors.milestones) setActiveTab("milestones") // Set active tab for milestones
       return
     }
 
@@ -661,7 +649,6 @@ export default function CreateCampaignPage() {
                   <TabsTrigger value="media">Media</TabsTrigger>
                   <TabsTrigger value="funding">Funding</TabsTrigger>
                   <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
-                  <TabsTrigger value="milestones">Milestones</TabsTrigger> {/* Added Milestones Tab Trigger */}
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-6">
@@ -756,6 +743,19 @@ export default function CreateCampaignPage() {
                             id="tags"
                             value={campaignData.basic.tags.join(", ")}
                             onChange={(e) => {
+                              // Store the raw value without splitting immediately
+                              // This allows users to type commas freely
+                              const value = e.target.value
+                              setCampaignData((prev) => ({
+                                ...prev,
+                                basic: {
+                                  ...prev.basic,
+                                  tags: value ? [value] : [], // Store as single string temporarily
+                                },
+                              }))
+                            }}
+                            onBlur={(e) => {
+                              // Split tags only when user finishes editing (on blur)
                               const value = e.target.value
                               const tags = value
                                 .split(",")
@@ -1041,9 +1041,9 @@ export default function CreateCampaignPage() {
                     <CardContent className="space-y-6">
                       {errors.rewards && (
                         <Alert>
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-center gap-3">
                             <span className="text-lg flex-shrink-0">⚠️</span>
-                            <p className="text-sm flex-1 min-w-0">{errors.rewards}</p>
+                            <p className="text-sm">{errors.rewards}</p>
                           </div>
                         </Alert>
                       )}
@@ -1074,62 +1074,6 @@ export default function CreateCampaignPage() {
                           </Card>
                         )}
                       </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                {/* Milestones Tab */}
-                <TabsContent value="milestones" className="space-y-6">
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <Users className="h-5 w-5" />
-                            Milestones
-                          </CardTitle>
-                          <CardDescription>Define milestones for your project</CardDescription>
-                        </div>
-                        <Button onClick={addMilestone}>
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Milestone
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {errors.milestones && (
-                        <Alert>
-                          <div className="flex items-start gap-3">
-                            <span className="text-lg flex-shrink-0">⚠️</span>
-                            <p className="text-sm flex-1 min-w-0">{errors.milestones}</p>
-                          </div>
-                        </Alert>
-                      )}
-                      {campaignData.milestones?.map((milestone, index) => (
-                        <MilestoneCard
-                          key={milestone.id}
-                          milestone={milestone}
-                          index={index}
-                          onUpdate={(updatedMilestone) => updateMilestone(index, updatedMilestone)}
-                          onDelete={() => deleteMilestone(index)}
-                        />
-                      ))}
-
-                      {!campaignData.milestones?.length && (
-                        <Card className="border-dashed">
-                          <CardContent className="pt-6 text-center">
-                            <span className="text-6xl mb-4 block">📅</span>
-                            <h3 className="text-lg font-semibold mb-2">No milestones yet</h3>
-                            <p className="text-muted-foreground mb-4">
-                              Define milestones to keep backers updated on your project progress.
-                            </p>
-                            <Button onClick={addMilestone}>
-                              <Plus className="h-4 w-4 mr-2" />
-                              Create Your First Milestone
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      )}
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -1189,14 +1133,6 @@ export default function CreateCampaignPage() {
                       <span>Reward Tiers</span>
                       <span className={campaignData.rewards.length > 0 ? "text-green-500" : "text-muted-foreground"}>
                         {campaignData.rewards.length > 0 ? "✓" : "○"}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Milestones</span>
-                      <span
-                        className={campaignData.milestones?.length > 0 ? "text-green-500" : "text-muted-foreground"}
-                      >
-                        {campaignData.milestones?.length > 0 ? "✓" : "○"}
                       </span>
                     </div>
                   </div>

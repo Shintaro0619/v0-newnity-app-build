@@ -169,7 +169,7 @@ export default function DashboardPage() {
     switch (status) {
       case "ACTIVE":
         return "default"
-      case "FUNDED":
+      case "SUCCESSFUL":
         return "default"
       case "FAILED":
         return "destructive"
@@ -315,7 +315,7 @@ export default function DashboardPage() {
                   const isNotDeployed = !campaign.blockchain_campaign_id
                   const deadlinePassed = isDeadlinePassed(campaign.end_date)
                   const canFinalize = deadlinePassed && campaign.status === "ACTIVE"
-                  const isFunded = campaign.status === "FUNDED"
+                  const isFunded = campaign.status === "SUCCESSFUL"
                   const isFailed = campaign.status === "FAILED"
 
                   return (

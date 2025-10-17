@@ -1,6 +1,23 @@
 import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
-import { injected, walletConnect } from "wagmi/connectors"
+import { injected } from "wagmi/connectors"
+
+if (typeof window !== "undefined") {
+  if (typeof (window as any).process === "undefined") {
+    ;(window as any).process = {
+      env: {},
+      version: "v18.0.0",
+      versions: {},
+      platform: "browser",
+      nextTick: (callback: Function, ...args: any[]) => {
+        setTimeout(() => callback(...args), 0)
+      },
+      emitWarning: function emitWarning(...args: any[]) {
+        return undefined
+      },
+    }
+  }
+}
 
 // Custom Base Sepolia configuration
 const baseSepoliaCustom = {
@@ -35,19 +52,7 @@ export const SUPPORTED_CHAINS = [
 
 export const config = createConfig({
   chains: SUPPORTED_CHAINS,
-  connectors: [
-    injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "demo-project-id-please-replace",
-      showQrModal: true,
-      metadata: {
-        name: "Newnity",
-        description: "Decentralized Crowdfunding Platform",
-        url: typeof window !== "undefined" ? window.location.origin : "https://newnity.app",
-        icons: ["https://newnity.app/icon.png"],
-      },
-    }),
-  ],
+  connectors: [injected()],
   transports: {
     [baseSepoliaCustom.id]: http(),
     [baseMainnetCustom.id]: http(),
