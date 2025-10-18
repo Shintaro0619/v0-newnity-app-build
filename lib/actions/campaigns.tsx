@@ -645,6 +645,7 @@ export async function savePledgeToDatabase(data: {
   amount: number // Changed from string to number
   txHash: string
   blockNumber: number // Changed from bigint to number
+  tierId?: string // Added optional tierId parameter
 }) {
   try {
     console.log("[v0] Saving pledge to database:", data)
@@ -662,6 +663,7 @@ export async function savePledgeToDatabase(data: {
         status,
         tx_hash,
         block_number,
+        tier_id,
         created_at,
         updated_at
       ) VALUES (
@@ -673,6 +675,7 @@ export async function savePledgeToDatabase(data: {
         'CONFIRMED',
         ${data.txHash},
         ${data.blockNumber.toString()},
+        ${data.tierId || null},
         NOW(),
         NOW()
       )
@@ -831,5 +834,35 @@ export async function saveFundsReleaseToDatabase(data: {
   } catch (error) {
     console.error("[v0] [SERVER ACTION] Error saving funds release to database:", error)
     return { success: false, error: String(error) }
+  }
+}
+
+export async function getCampaignTiers(campaignId: string) {
+  try {
+    console.log("[v0] getCampaignTiers called with campaignId:", campaignId)
+
+    const tiers = await sql`
+      SELECT 
+        id,
+        title,
+        description,
+        amount,
+        rewards,
+        max_backers,
+        is_limited,
+        estimated_delivery,
+        shipping_cost,
+        created_at
+      FROM tiers
+      WHERE campaign_id = ${campaignId}
+      ORDER BY amount ASC
+    `
+
+    console.log("[v0] Found tiers:", tiers.length)
+
+    return tiers
+  } catch (error) {
+    console.error("[v0] Error fetching campaign tiers:", error)
+    return []
   }
 }

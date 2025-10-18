@@ -223,7 +223,12 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     setShowPledgeModal(true)
   }
 
-  const handlePledgeSuccess = async (pledgeData: { hash: string; amount: string; backerAddress: string }) => {
+  const handlePledgeSuccess = async (pledgeData: {
+    hash: string
+    amount: string
+    backerAddress: string
+    tierId?: string
+  }) => {
     console.log("[v0] Pledge successful, saving to database and refreshing campaign data")
 
     if (campaign.id && pledgeData) {
@@ -236,6 +241,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
           amount: amountNumber,
           txHash: pledgeData.hash,
           blockNumber: 0,
+          tierId: pledgeData.tierId,
         })
 
         console.log("[v0] Pledge saved to database successfully")
@@ -635,6 +641,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
         <PledgeModalV2
           campaignId={BigInt(blockchainId)}
           campaignTitle={campaign.title}
+          campaignDbId={campaign.id}
           onClose={() => setShowPledgeModal(false)}
           onSuccess={handlePledgeSuccess}
         />

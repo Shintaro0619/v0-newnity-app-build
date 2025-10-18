@@ -285,7 +285,7 @@ export default function DashboardPage() {
               <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{stats.successRate}%</div>
+              <div className="text-2xl font-bold text-primary">{stats.successRate.toFixed(2)}%</div>
               <p className="text-xs text-muted-foreground">Above platform average</p>
             </CardContent>
           </Card>
@@ -332,7 +332,7 @@ export default function DashboardPage() {
 
                       {isDraft && isNotDeployed && (
                         <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-                          <span className="text-lg">⚠️</span>
+                          <span className="text-lg mr-2">⚠️</span>
                           <AlertDescription>
                             <strong>Campaign Not Live:</strong> This campaign is saved as a draft. Deploy it to the
                             blockchain to make it live and start accepting pledges.
@@ -342,7 +342,7 @@ export default function DashboardPage() {
 
                       {isFunded && (
                         <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-950">
-                          <span className="text-lg">✅</span>
+                          <span className="text-lg mr-2">✅</span>
                           <AlertDescription>
                             <strong>Campaign Successful!</strong> Funds have been automatically released to your wallet.
                           </AlertDescription>
