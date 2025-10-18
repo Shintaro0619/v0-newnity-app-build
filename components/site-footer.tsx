@@ -7,10 +7,13 @@ export function SiteFooter() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           {/* Brand */}
           <div className="space-y-3">
-            <h3 className="text-xl font-bold">
-              <span className="text-white">new</span>
-              <span className="text-primary">nity</span>
-            </h3>
+            <div className="flex items-center space-x-2">
+              <img src="/newnity-logo.png" alt="newnity" width={32} height={32} className="object-contain" />
+              <h3 className="text-xl font-bold">
+                <span className="text-white">new</span>
+                <span className="text-primary">nity</span>
+              </h3>
+            </div>
             <p className="text-sm text-gray-400">Where passion meets purpose. USDC crowdfunding on newnity.</p>
           </div>
 
@@ -18,18 +21,9 @@ export function SiteFooter() {
           <div>
             <h4 className="font-semibold text-white mb-3">Platform</h4>
             <nav className="flex flex-col gap-2 text-sm text-gray-400">
-              <a href="#about" className="hover:text-primary transition-colors">
+              <Link href="/about" className="hover:text-primary transition-colors">
                 About
-              </a>
-              <a href="#howItWorks" className="hover:text-primary transition-colors">
-                How it works
-              </a>
-              <a href="#faq" className="hover:text-primary transition-colors">
-                FAQ
-              </a>
-              <a href="#fees" className="hover:text-primary transition-colors">
-                Fees
-              </a>
+              </Link>
             </nav>
           </div>
 

@@ -1,5 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { createCampaign } from "@/lib/actions/campaigns"
+import { createCampaign, createCampaignTiers } from "@/lib/actions/campaigns"
 import { put } from "@vercel/blob"
 
 export async function POST(request: NextRequest) {
@@ -73,6 +73,26 @@ export async function POST(request: NextRequest) {
       contract_tx_hash: undefined,
       escrow_address: undefined,
     })
+
+    if (rewards && Array.isArray(rewards) && rewards.length > 0) {
+      console.log("[v0] Saving reward tiers:", rewards.length)
+      await createCampaignTiers(
+        campaign.id,
+        rewards.map((tier: any, index: number) => ({
+          title: tier.title,
+          description: tier.description,
+          amount: tier.amount,
+          rewards: tier.rewards || [],
+          maxBackers: tier.quantity,
+          isLimited: tier.isLimited || false,
+          estimatedDelivery: tier.deliveryDate,
+          shippingCost: tier.shippingCost,
+          startsAt: tier.startsAt,
+          endsAt: tier.endsAt,
+          sortOrder: index,
+        })),
+      )
+    }
 
     return NextResponse.json({
       success: true,

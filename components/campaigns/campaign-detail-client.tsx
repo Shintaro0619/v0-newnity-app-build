@@ -404,7 +404,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
               </CardHeader>
               <CardContent className="space-y-4">
                 <div
-                  className="text-muted-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert"
+                  className="text-muted-foreground leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-ul:text-muted-foreground prose-ol:text-muted-foreground"
                   dangerouslySetInnerHTML={{ __html: campaign.story || campaign.description }}
                 />
               </CardContent>

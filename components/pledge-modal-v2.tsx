@@ -1,5 +1,6 @@
 "use client"
 
+import { Alert } from "@/components/ui/alert"
 import { useState, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { formatUnits } from "viem"
@@ -8,16 +9,18 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardDescription, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
-import { Loader2, DollarSign, AlertCircle, Check } from "lucide-react"
+import { Loader2, DollarSign, AlertCircle, Check, Clock } from "lucide-react"
 import { useCampaignContract } from "@/lib/hooks/use-campaign-contract"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { getCampaignTiers } from "@/lib/actions/campaigns"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Badge } from "@/components/ui/badge"
+import { isTierAvailable, getTierStatusMessage, fromAtomicUsdc, formatUSDC } from "@/lib/utils/tier-utils"
 
 interface PledgeModalV2Props {
   campaignId: bigint
   campaignTitle: string
   campaignDbId: string
+  minContribution?: number // Add minimum contribution prop (in USDC atomic units)
   onClose: () => void
   onSuccess?: (pledgeData: { hash: string; amount: string; backerAddress: string; tierId?: string }) => void
 }
@@ -26,20 +29,31 @@ interface Tier {
   id: string
   title: string
   description: string
-  amount: number
+  amount: number // This is in USDC (not atomic)
   rewards: string[]
-  max_backers: number | null
   is_limited: boolean
+  is_active?: boolean // Add is_active flag
   estimated_delivery: string | null
   shipping_cost: number | null
+  starts_at?: string | null // Add time constraints
+  ends_at?: string | null
+  sort_order?: number // Add sort order
 }
 
-export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose, onSuccess }: PledgeModalV2Props) {
+export function PledgeModalV2({
+  campaignId,
+  campaignTitle,
+  campaignDbId,
+  minContribution = 1000000, // Default 1 USDC in atomic units
+  onClose,
+  onSuccess,
+}: PledgeModalV2Props) {
   const [amount, setAmount] = useState("")
   const [step, setStep] = useState<"input" | "approve" | "pledge">("input")
   const [tiers, setTiers] = useState<Tier[]>([])
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null)
   const [customAmount, setCustomAmount] = useState(false)
+  const [nowUtcSec, setNowUtcSec] = useState(Math.floor(Date.now() / 1000))
 
   const { isConnected, address } = useAccount()
 
@@ -71,6 +85,13 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
   const hasEnoughAllowance = usdcAllowance ? usdcAllowance >= amountInWei : false
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      setNowUtcSec(Math.floor(Date.now() / 1000))
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [])
+
+  useEffect(() => {
     const loadTiers = async () => {
       const fetchedTiers = await getCampaignTiers(campaignDbId)
       setTiers(fetchedTiers)
@@ -85,8 +106,11 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
       if (selectedTier) {
         setAmount(selectedTier.amount.toString())
       }
+    } else if (customAmount) {
+      // Set to minimum contribution when "pledge without reward" is selected
+      setAmount(fromAtomicUsdc(minContribution).toString())
     }
-  }, [selectedTierId, tiers, customAmount])
+  }, [selectedTierId, tiers, customAmount, minContribution])
 
   const resetForm = () => {
     setAmount("")
@@ -141,6 +165,13 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
       return
     }
 
+    const selectedTier = tiers.find((t) => t.id === selectedTierId)
+    const minAmount = selectedTier ? selectedTier.amount : fromAtomicUsdc(minContribution)
+    if (Number.parseFloat(amount) < minAmount) {
+      alert(`Minimum pledge amount is $${minAmount}`)
+      return
+    }
+
     if (!hasEnoughAllowance) {
       setStep("approve")
       return
@@ -153,7 +184,12 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
     handlePledge(campaignIdNumber, amount)
   }
 
-  const minPledgeAmount = tiers.length > 0 ? Math.min(...tiers.map((t) => t.amount)) : 0
+  const sortedTiers = [...tiers].sort((a, b) => {
+    if (a.sort_order !== undefined && b.sort_order !== undefined) {
+      return a.sort_order - b.sort_order
+    }
+    return a.amount - b.amount
+  })
 
   if (!isConnected) {
     return (
@@ -178,17 +214,17 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
         {!campaignExistsOnChain && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
+            <div className="text-sm mt-2">
               This campaign does not exist on the blockchain yet. The campaign creator needs to deploy it on-chain
               before you can pledge.
-            </AlertDescription>
+            </div>
           </Alert>
         )}
 
         {pledgeError && step === "pledge" && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{pledgeError.message}</AlertDescription>
+            <div className="text-sm mt-2">{pledgeError.message}</div>
           </Alert>
         )}
 
@@ -198,99 +234,121 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
               <div className="space-y-3">
                 <Label>Select a Reward Tier</Label>
                 <RadioGroup
-                  value={selectedTierId || ""}
+                  value={customAmount ? "custom" : selectedTierId || ""}
                   onValueChange={(value) => {
-                    setSelectedTierId(value)
-                    setCustomAmount(false)
+                    if (value === "custom") {
+                      setCustomAmount(true)
+                      setSelectedTierId(null)
+                    } else {
+                      setSelectedTierId(value)
+                      setCustomAmount(false)
+                    }
                   }}
                 >
-                  {tiers.map((tier) => (
-                    <Card
-                      key={tier.id}
-                      className={`cursor-pointer transition-all ${
-                        selectedTierId === tier.id
-                          ? "border-primary ring-2 ring-primary/20"
-                          : "hover:border-muted-foreground/20"
-                      }`}
-                      onClick={() => {
-                        setSelectedTierId(tier.id)
-                        setCustomAmount(false)
-                      }}
-                    >
-                      <CardHeader className="pb-3">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <RadioGroupItem value={tier.id} id={tier.id} />
-                              <CardTitle className="text-base">{tier.title}</CardTitle>
+                  {sortedTiers.map((tier) => {
+                    const available = isTierAvailable(tier, nowUtcSec)
+                    const statusMessage = getTierStatusMessage(tier, nowUtcSec)
+
+                    return (
+                      <Card
+                        key={tier.id}
+                        className={`cursor-pointer transition-all ${
+                          selectedTierId === tier.id
+                            ? "border-primary ring-2 ring-primary/20"
+                            : available
+                              ? "hover:border-muted-foreground/20"
+                              : "opacity-60 cursor-not-allowed"
+                        }`}
+                        onClick={() => {
+                          if (available) {
+                            setSelectedTierId(tier.id)
+                            setCustomAmount(false)
+                          }
+                        }}
+                      >
+                        <CardHeader className="pb-3">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <RadioGroupItem value={tier.id} id={tier.id} disabled={!available} />
+                                <CardTitle className="text-base">{tier.title}</CardTitle>
+                                {statusMessage && (
+                                  <Badge variant={available ? "secondary" : "destructive"} className="text-xs">
+                                    {statusMessage}
+                                  </Badge>
+                                )}
+                              </div>
+                              <CardDescription
+                                className="mt-1"
+                                dangerouslySetInnerHTML={{ __html: tier.description }}
+                              />
                             </div>
-                            <CardDescription className="mt-1">{tier.description}</CardDescription>
+                            <div className="text-right flex-shrink-0">
+                              <div className="text-lg font-bold text-primary">${formatUSDC(tier.amount)}</div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-lg font-bold text-primary">${tier.amount}</div>
-                            {tier.is_limited && tier.max_backers && (
-                              <div className="text-xs text-muted-foreground">Limited: {tier.max_backers} spots</div>
+                        </CardHeader>
+                        {tier.rewards && tier.rewards.length > 0 && (
+                          <CardContent className="pt-0">
+                            <div className="space-y-1">
+                              <p className="text-xs font-medium text-muted-foreground">Includes:</p>
+                              {tier.rewards.map((reward, index) => (
+                                <div key={index} className="flex items-start gap-2 text-sm">
+                                  <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                                  <span>{reward}</span>
+                                </div>
+                              ))}
+                            </div>
+                            {tier.estimated_delivery && (
+                              <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
+                                <Clock className="h-3 w-3" />
+                                <span>
+                                  Estimated delivery: {new Date(tier.estimated_delivery).toLocaleDateString()}
+                                </span>
+                              </div>
                             )}
+                          </CardContent>
+                        )}
+                      </Card>
+                    )
+                  })}
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">Or</span>
+                    </div>
+                  </div>
+
+                  <Card
+                    className={`cursor-pointer transition-all ${
+                      customAmount ? "border-primary ring-2 ring-primary/20" : "hover:border-muted-foreground/20"
+                    }`}
+                    onClick={() => {
+                      setCustomAmount(true)
+                      setSelectedTierId(null)
+                    }}
+                  >
+                    <CardHeader>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <RadioGroupItem value="custom" id="custom" />
+                            <CardTitle className="text-base">Pledge without a reward</CardTitle>
+                          </div>
+                          <CardDescription>Support this project with a custom amount</CardDescription>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-sm font-medium text-muted-foreground">
+                            Min ${formatUSDC(fromAtomicUsdc(minContribution))}
                           </div>
                         </div>
-                      </CardHeader>
-                      {tier.rewards && tier.rewards.length > 0 && (
-                        <CardContent className="pt-0">
-                          <div className="space-y-1">
-                            <p className="text-xs font-medium text-muted-foreground">Includes:</p>
-                            {tier.rewards.map((reward, index) => (
-                              <div key={index} className="flex items-start gap-2 text-sm">
-                                <Check className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
-                                <span>{reward}</span>
-                              </div>
-                            ))}
-                          </div>
-                          {tier.estimated_delivery && (
-                            <p className="text-xs text-muted-foreground mt-2">
-                              Estimated delivery: {new Date(tier.estimated_delivery).toLocaleDateString()}
-                            </p>
-                          )}
-                        </CardContent>
-                      )}
-                    </Card>
-                  ))}
+                      </div>
+                    </CardHeader>
+                  </Card>
                 </RadioGroup>
-
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or</span>
-                  </div>
-                </div>
-
-                <Card
-                  className={`cursor-pointer transition-all ${
-                    customAmount ? "border-primary ring-2 ring-primary/20" : "hover:border-muted-foreground/20"
-                  }`}
-                  onClick={() => {
-                    setCustomAmount(true)
-                    setSelectedTierId(null)
-                    setAmount("")
-                  }}
-                >
-                  <CardHeader>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem
-                        value="custom"
-                        id="custom"
-                        checked={customAmount}
-                        onClick={() => {
-                          setCustomAmount(true)
-                          setSelectedTierId(null)
-                        }}
-                      />
-                      <CardTitle className="text-base">Pledge without a reward</CardTitle>
-                    </div>
-                    <CardDescription>Enter a custom amount to support this project</CardDescription>
-                  </CardHeader>
-                </Card>
               </div>
             )}
 
@@ -302,21 +360,41 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
                   <Input
                     id="amount"
                     type="number"
-                    placeholder={minPledgeAmount > 0 ? `Minimum: ${minPledgeAmount}` : "0.00"}
+                    placeholder={`Minimum: ${formatUSDC(fromAtomicUsdc(minContribution))}`}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="pl-10"
-                    min={minPledgeAmount}
+                    min={fromAtomicUsdc(minContribution)}
                     step="0.01"
                     disabled={!campaignExistsOnChain}
                   />
                 </div>
                 {usdcBalance && (
-                  <p className="text-xs text-muted-foreground mt-1">Balance: {formatUnits(usdcBalance, 6)} USDC</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Balance: {formatUSDC(formatUnits(usdcBalance, 6))} USDC
+                  </p>
                 )}
-                {minPledgeAmount > 0 && (
-                  <p className="text-xs text-muted-foreground mt-1">Minimum pledge: ${minPledgeAmount}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Minimum pledge: ${formatUSDC(fromAtomicUsdc(minContribution))}
+                </p>
+              </div>
+            )}
+
+            {selectedTierId && !customAmount && (
+              <div>
+                <Label htmlFor="tier-amount">Pledge Amount (USDC)</Label>
+                <div className="relative">
+                  <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input id="tier-amount" type="text" value={amount} className="pl-10 bg-muted" disabled />
+                </div>
+                {usdcBalance && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Balance: {formatUSDC(formatUnits(usdcBalance, 6))} USDC
+                  </p>
                 )}
+                <p className="text-xs text-muted-foreground mt-1">
+                  This tier requires a pledge of ${formatUSDC(amount)}
+                </p>
               </div>
             )}
 
@@ -326,7 +404,10 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
                 !amount ||
                 !hasEnoughBalance ||
                 Number.parseFloat(amount) <= 0 ||
-                (minPledgeAmount > 0 && Number.parseFloat(amount) < minPledgeAmount) ||
+                Number.parseFloat(amount) <
+                  (selectedTierId
+                    ? tiers.find((t) => t.id === selectedTierId)?.amount || 0
+                    : fromAtomicUsdc(minContribution)) ||
                 !campaignExistsOnChain
               }
               className="w-full bg-[#1DB954] hover:bg-[#1DB954]/90 text-white"
@@ -370,7 +451,7 @@ export function PledgeModalV2({ campaignId, campaignTitle, campaignDbId, onClose
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Step 2: Confirm Pledge</CardTitle>
-                <CardDescription>Pledge {amount} USDC to this campaign</CardDescription>
+                <CardDescription>Pledge {formatUSDC(amount)} USDC to this campaign</CardDescription>
               </CardHeader>
             </Card>
 

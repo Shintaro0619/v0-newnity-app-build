@@ -319,7 +319,7 @@ export default function USDCDiagnosticPage() {
         <h2 className="text-xl font-semibold mb-4">Mock USDC Contract</h2>
         <div className="space-y-2 text-sm">
           <p>
-            <strong>Address:</strong> <code className="bg-gray-100 px-2 py-1 rounded">{MOCK_USDC_ADDRESS}</code>
+            <strong>Address:</strong> <code className="bg-gray-800 px-2 py-1 rounded">{MOCK_USDC_ADDRESS}</code>
           </p>
           <p>
             <strong>Exists:</strong>{" "}
@@ -364,11 +364,11 @@ export default function USDCDiagnosticPage() {
         <h2 className="text-xl font-semibold mb-4">Escrow Contract</h2>
         <div className="space-y-2 text-sm">
           <p>
-            <strong>Address:</strong> <code className="bg-gray-100 px-2 py-1 rounded">{ESCROW_ADDRESS}</code>
+            <strong>Address:</strong> <code className="bg-gray-800 px-2 py-1 rounded">{ESCROW_ADDRESS}</code>
           </p>
           <p>
             <strong>USDC Address:</strong>{" "}
-            <code className="bg-gray-100 px-2 py-1 rounded text-xs">{diagnostics.escrow?.usdcAddress}</code>
+            <code className="bg-gray-800 px-2 py-1 rounded text-xs">{diagnostics.escrow?.usdcAddress}</code>
           </p>
           <p>
             <strong>USDC Match:</strong>{" "}
@@ -382,7 +382,7 @@ export default function USDCDiagnosticPage() {
           </p>
           <p>
             <strong>Platform Wallet:</strong>{" "}
-            <code className="bg-gray-100 px-2 py-1 rounded text-xs">{diagnostics.escrow?.platformWallet}</code>
+            <code className="bg-gray-800 px-2 py-1 rounded text-xs">{diagnostics.escrow?.platformWallet}</code>
           </p>
           <p>
             <strong>Next Campaign ID:</strong> {diagnostics.escrow?.nextCampaignId}
@@ -409,7 +409,7 @@ export default function USDCDiagnosticPage() {
 
       {/* Test Results */}
       {testResults.length > 0 && (
-        <Card className="p-6 mb-6 bg-gray-50">
+        <Card className="p-6 mb-6 bg-gray-900">
           <h2 className="text-xl font-semibold mb-4">Test Results</h2>
           <pre className="text-xs font-mono whitespace-pre-wrap bg-black text-green-400 p-4 rounded overflow-x-auto">
             {testResults.join("\n")}
@@ -421,21 +421,21 @@ export default function USDCDiagnosticPage() {
       <Card className="p-6">
         <h2 className="text-xl font-semibold mb-4">診断結果と推奨事項</h2>
         {!diagnostics.usdc?.contractExists ? (
-          <div className="bg-red-50 p-4 rounded">
-            <p className="font-semibold text-red-800 mb-2">❌ Mock USDCコントラクトが存在しません</p>
+          <div className="bg-red-950/30 p-4 rounded">
+            <p className="font-semibold text-red-400 mb-2">❌ Mock USDCコントラクトが存在しません</p>
             <p className="text-sm mb-2">新しいMock USDCをデプロイする必要があります。</p>
           </div>
         ) : !diagnostics.escrow?.usdcMatches ? (
-          <div className="bg-yellow-50 p-4 rounded">
-            <p className="font-semibold text-yellow-800 mb-2">⚠️ USDCアドレスが一致しません</p>
+          <div className="bg-yellow-950/30 p-4 rounded">
+            <p className="font-semibold text-yellow-400 mb-2">⚠️ USDCアドレスが一致しません</p>
             <p className="text-sm mb-2">
               Escrowコントラクトは別のUSDCアドレス（{diagnostics.escrow?.usdcAddress}）を使用しています。
             </p>
             <p className="text-sm">正しいUSDCアドレスで新しいEscrowコントラクトをデプロイする必要があります。</p>
           </div>
         ) : (
-          <div className="bg-green-50 p-4 rounded">
-            <p className="font-semibold text-green-800 mb-2">✅ 両方のコントラクトが正しく設定されています</p>
+          <div className="bg-green-950/30 p-4 rounded">
+            <p className="font-semibold text-green-400 mb-2">✅ 両方のコントラクトが正しく設定されています</p>
             <p className="text-sm mb-2">「Run Full Diagnostic」ボタンを押して、詳細なテストを実行してください。</p>
           </div>
         )}

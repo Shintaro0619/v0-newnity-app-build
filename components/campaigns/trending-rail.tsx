@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react"
 import { CampaignCard } from "./campaign-card"
+import { getCampaigns } from "@/lib/actions/campaigns"
 
 interface Campaign {
-  id: number
+  id: string
   title: string
   creator: string
   image: string
@@ -14,6 +15,7 @@ interface Campaign {
   category: string
   daysLeft: number
   status: "live" | "upcoming" | "funded"
+  blockchainCampaignId?: number
 }
 
 export function TrendingRail() {
@@ -21,46 +23,39 @@ export function TrendingRail() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const mockCampaigns: Campaign[] = [
-      {
-        id: 201,
-        title: "Revolutionary VR Gaming Experience",
-        creator: "NextGen VR Studios",
-        image: "/virtual-reality-gaming-headset-futuristic.jpg",
-        raised: 456700,
-        goal: 500000,
-        backers: 2834,
-        category: "Game",
-        daysLeft: 9,
-        status: "live",
-      },
-      {
-        id: 202,
-        title: "Sustainable Tech Gadget",
-        creator: "EcoTech Innovations",
-        image: "/eco-friendly-technology-sustainable-gadget.jpg",
-        raised: 298500,
-        goal: 300000,
-        backers: 1923,
-        category: "Tech",
-        daysLeft: 11,
-        status: "live",
-      },
-      {
-        id: 203,
-        title: "Indie Film: Tokyo Nights",
-        creator: "Independent Cinema Collective",
-        image: "/tokyo-night-cityscape-cinematic-neon.jpg",
-        raised: 187300,
-        goal: 200000,
-        backers: 1456,
-        category: "Film",
-        daysLeft: 7,
-        status: "live",
-      },
-    ]
-    setCampaigns(mockCampaigns)
-    setLoading(false)
+    const loadCampaigns = async () => {
+      try {
+        const data = await getCampaigns({
+          status: "ACTIVE",
+          limit: 3,
+          sortBy: "raised_amount",
+          sortOrder: "desc",
+        })
+
+        const transformed = data.map((c: any) => ({
+          id: c.id,
+          title: c.title,
+          creator: c.creator_name || "Anonymous",
+          image: c.cover_image || "/placeholder.svg?height=400&width=600",
+          raised: c.raised_amount || 0,
+          goal: c.goal_amount,
+          backers: Number.parseInt(c.backers_count) || 0,
+          category: c.category,
+          daysLeft: Math.max(0, Math.ceil((new Date(c.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
+          status: "live" as const,
+          blockchainCampaignId: c.blockchain_campaign_id,
+        }))
+
+        setCampaigns(transformed)
+      } catch (error) {
+        console.error("[v0] Failed to load trending campaigns:", error)
+        setCampaigns([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadCampaigns()
   }, [])
 
   if (loading) {
@@ -76,6 +71,10 @@ export function TrendingRail() {
         </div>
       </section>
     )
+  }
+
+  if (campaigns.length === 0) {
+    return null
   }
 
   return (

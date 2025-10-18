@@ -644,15 +644,35 @@ export default function CreateCampaignPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                  <TabsTrigger value="media">Media</TabsTrigger>
-                  <TabsTrigger value="funding">Funding</TabsTrigger>
-                  <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
+                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
+                  <TabsTrigger
+                    value="basic"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                  >
+                    Basic Info
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="media"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                  >
+                    Media
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="funding"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                  >
+                    Funding
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="tiers"
+                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                  >
+                    Reward Tiers
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-6">
-                  <Card>
+                  <Card className="border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <span className="text-2xl">📄</span>
@@ -778,7 +798,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="media" className="space-y-6">
-                  <Card>
+                  <Card className="border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <ImageIcon className="h-5 w-5" />
@@ -886,7 +906,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="funding" className="space-y-6">
-                  <Card>
+                  <Card className="border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Target className="h-5 w-5" />
@@ -1022,7 +1042,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="tiers" className="space-y-6">
-                  <Card>
+                  <Card className="border-primary/20">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
@@ -1093,7 +1113,7 @@ export default function CreateCampaignPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              <Card>
+              <Card className="border-primary/20">
                 <CardHeader>
                   <CardTitle className="text-sm">Campaign Progress</CardTitle>
                 </CardHeader>

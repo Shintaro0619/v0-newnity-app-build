@@ -641,11 +641,11 @@ export async function getUserPledgeStats(walletAddress: string) {
 
 export async function savePledgeToDatabase(data: {
   campaignId: string
-  backerWalletAddress: string // Changed from backerId to backerWalletAddress
-  amount: number // Changed from string to number
+  backerWalletAddress: string
+  amount: number
   txHash: string
-  blockNumber: number // Changed from bigint to number
-  tierId?: string // Added optional tierId parameter
+  blockNumber: number
+  tierId?: string
 }) {
   try {
     console.log("[v0] Saving pledge to database:", data)
@@ -848,15 +848,43 @@ export async function getCampaignTiers(campaignId: string) {
         description,
         amount,
         rewards,
-        max_backers,
         is_limited,
+        COALESCE(is_active, true) as is_active,
         estimated_delivery,
         shipping_cost,
+        starts_at,
+        ends_at,
+        COALESCE(sort_order, 0) as sort_order,
         created_at
       FROM tiers
       WHERE campaign_id = ${campaignId}
-      ORDER BY amount ASC
-    `
+      ORDER BY COALESCE(sort_order, 0) ASC, amount ASC
+    `.catch(async (error) => {
+      // If the new columns don't exist, fall back to basic query
+      if (error.message?.includes("does not exist")) {
+        console.log("[v0] Falling back to basic tier query (new columns not found)")
+        return await sql`
+          SELECT 
+            id,
+            title,
+            description,
+            amount,
+            rewards,
+            is_limited,
+            true as is_active,
+            estimated_delivery,
+            shipping_cost,
+            NULL as starts_at,
+            NULL as ends_at,
+            0 as sort_order,
+            created_at
+          FROM tiers
+          WHERE campaign_id = ${campaignId}
+          ORDER BY amount ASC
+        `
+      }
+      throw error
+    })
 
     console.log("[v0] Found tiers:", tiers.length)
 
@@ -864,5 +892,119 @@ export async function getCampaignTiers(campaignId: string) {
   } catch (error) {
     console.error("[v0] Error fetching campaign tiers:", error)
     return []
+  }
+}
+
+export async function createCampaignTiers(
+  campaignId: string,
+  tiers: Array<{
+    title: string
+    description: string
+    amount: number
+    rewards: string[]
+    maxBackers?: number
+    isLimited: boolean
+    estimatedDelivery?: string
+    shippingCost?: number
+    startsAt?: string
+    endsAt?: string
+    sortOrder?: number
+  }>,
+) {
+  try {
+    console.log("[v0] Creating campaign tiers:", { campaignId, tierCount: tiers.length })
+
+    for (const [index, tier] of tiers.entries()) {
+      await sql`
+        INSERT INTO tiers (
+          id,
+          campaign_id,
+          title,
+          description,
+          amount,
+          rewards,
+          max_backers,
+          minted,
+          is_limited,
+          is_active,
+          estimated_delivery,
+          shipping_cost,
+          starts_at,
+          ends_at,
+          sort_order,
+          created_at,
+          updated_at
+        ) VALUES (
+          gen_random_uuid(),
+          ${campaignId},
+          ${tier.title},
+          ${tier.description},
+          ${tier.amount},
+          ${tier.rewards},
+          ${tier.maxBackers || null},
+          0,
+          ${tier.isLimited},
+          true,
+          ${tier.estimatedDelivery || null},
+          ${tier.shippingCost || null},
+          ${tier.startsAt || null},
+          ${tier.endsAt || null},
+          ${tier.sortOrder !== undefined ? tier.sortOrder : index},
+          NOW(),
+          NOW()
+        )
+      `
+    }
+
+    console.log("[v0] Campaign tiers created successfully")
+    return { success: true }
+  } catch (error) {
+    console.error("[v0] Error creating campaign tiers:", error)
+    throw error
+  }
+}
+
+export async function deleteDummyCampaigns() {
+  try {
+    console.log("[v0] [SERVER ACTION] Deleting dummy campaigns (blockchain_id IS NULL)...")
+
+    const tiersResult = await sql`
+      DELETE FROM tiers
+      WHERE campaign_id IN (
+        SELECT id FROM campaigns WHERE blockchain_campaign_id IS NULL
+      )
+    `
+    console.log("[v0] [SERVER ACTION] Deleted tiers:", tiersResult.count)
+
+    const pledgesResult = await sql`
+      DELETE FROM pledges
+      WHERE campaign_id IN (
+        SELECT id FROM campaigns WHERE blockchain_campaign_id IS NULL
+      )
+    `
+    console.log("[v0] [SERVER ACTION] Deleted pledges:", pledgesResult.count)
+
+    const campaignsResult = await sql`
+      DELETE FROM campaigns
+      WHERE blockchain_campaign_id IS NULL
+      RETURNING id, title
+    `
+    console.log("[v0] [SERVER ACTION] Deleted campaigns:", campaignsResult.length)
+    console.log(
+      "[v0] [SERVER ACTION] Deleted campaign titles:",
+      campaignsResult.map((c) => c.title),
+    )
+
+    return {
+      success: true,
+      deletedCount: campaignsResult.length,
+      deletedCampaigns: campaignsResult,
+    }
+  } catch (error) {
+    console.error("[v0] [SERVER ACTION] Error deleting dummy campaigns:", error)
+    return {
+      success: false,
+      error: String(error),
+    }
   }
 }

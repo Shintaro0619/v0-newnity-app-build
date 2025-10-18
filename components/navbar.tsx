@@ -71,7 +71,7 @@ export function Navbar() {
               </Button>
             </Link>
 
-            <Link href="/">
+            <Link href="/about">
               <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
                 About
               </Button>
