@@ -23,8 +23,6 @@ const nextConfig = {
     
     return config
   },
-  // 出力設定を最適化
-  output: 'standalone',
 }
 
 export default nextConfig
