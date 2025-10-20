@@ -3,6 +3,7 @@ import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
+import { formatCurrency, formatPercentage } from "@/lib/utils"
 
 interface CampaignCardProps {
   id: string
@@ -78,9 +79,9 @@ export function CampaignCard({
 
           <div className="space-y-2 mt-auto">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-primary font-bold">${raised.toLocaleString()} USDC</span>
+              <span className="text-primary font-bold">${formatCurrency(raised)} USDC</span>
               <span className="text-gray-500 text-xs">
-                {Math.round(progress)}% / ${goal.toLocaleString()}
+                {formatPercentage(progress)}% / ${formatCurrency(goal)}
               </span>
             </div>
             <Progress value={progress} className="h-1.5 bg-gray-800" />

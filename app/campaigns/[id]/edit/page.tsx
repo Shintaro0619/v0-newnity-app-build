@@ -7,34 +7,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { RichEditor } from "@/components/ui/rich-editor"
 import { MediaUpload } from "@/components/ui/media-upload"
 import { Progress } from "@/components/ui/progress"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { RichEditor } from "@/components/ui/rich-editor"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import {
-  Save,
-  Eye,
-  Settings,
-  ImageIcon,
-  Target,
-  Calendar,
-  Users,
-  DollarSign,
-  AlertTriangle,
-  Clock,
-  BarChart3,
-  Edit3,
-  Trash2,
-  Plus,
-  ArrowLeft,
-} from "lucide-react"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { format } from "date-fns"
 import Link from "next/link"
+import { ImageIcon, AlertTriangle, Clock, BarChart3, ArrowLeft, Save, Plus, Trash2, CalendarIcon } from "lucide-react"
 
 interface Campaign {
   id: string
@@ -57,6 +44,13 @@ interface Campaign {
   updatedAt: string
   tiers: Tier[]
   milestones: Milestone[]
+  socialLinks?: {
+    website?: string
+    x?: string
+    instagram?: string
+    youtube?: string
+    tiktok?: string
+  }
 }
 
 interface Tier {
@@ -87,15 +81,34 @@ export default function EditCampaignPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
 
   useEffect(() => {
     const fetchCampaign = async () => {
       try {
+        console.log("[v0] Fetching campaign:", params.id)
+
         const response = await fetch(`/api/campaigns/${params.id}`)
         if (!response.ok) {
           throw new Error("Failed to fetch campaign")
         }
         const data = await response.json()
+
+        console.log("[v0] Campaign data received:", data)
+
+        const transformedTiers = Array.isArray(data.tiers)
+          ? data.tiers.map((tier: any) => ({
+              id: tier.id,
+              title: tier.title,
+              description: tier.description,
+              amount: Number(tier.amount),
+              isLimited: tier.is_limited || false,
+              maxBackers: tier.max_backers || undefined,
+              rewards: Array.isArray(tier.rewards) ? tier.rewards : [],
+              estimatedDelivery: tier.estimated_delivery,
+              shippingCost: tier.shipping_cost,
+            }))
+          : []
 
         const transformedCampaign: Campaign = {
           id: data.id,
@@ -116,13 +129,16 @@ export default function EditCampaignPage() {
           endDate: data.end_date,
           createdAt: data.created_at,
           updatedAt: data.updated_at,
-          tiers: Array.isArray(data.tiers) ? data.tiers : [],
+          tiers: transformedTiers,
           milestones: Array.isArray(data.milestones) ? data.milestones : [],
+          socialLinks: data.social_links || {},
         }
 
+        console.log("[v0] Transformed campaign:", transformedCampaign)
+        console.log("[v0] Transformed tiers:", transformedTiers)
         setCampaign(transformedCampaign)
       } catch (error) {
-        console.error("Error fetching campaign:", error)
+        console.error("[v0] Error fetching campaign:", error)
       } finally {
         setLoading(false)
       }
@@ -138,6 +154,8 @@ export default function EditCampaignPage() {
 
     setSaving(true)
     try {
+      console.log("[v0] Saving campaign with tiers:", campaign.tiers)
+
       const response = await fetch(`/api/campaigns/${campaign.id}`, {
         method: "PUT",
         headers: {
@@ -158,8 +176,19 @@ export default function EditCampaignPage() {
           video_url: campaign.videoUrl,
           start_date: campaign.startDate,
           end_date: campaign.endDate,
-          tiers: campaign.tiers,
+          tiers: campaign.tiers.map((tier) => ({
+            id: tier.id,
+            title: tier.title,
+            description: tier.description,
+            amount: tier.amount,
+            isLimited: tier.isLimited,
+            maxBackers: tier.maxBackers,
+            rewards: tier.rewards || [],
+            estimatedDelivery: tier.estimatedDelivery,
+            shippingCost: tier.shippingCost,
+          })),
           milestones: campaign.milestones,
+          social_links: campaign.socialLinks,
         }),
       })
 
@@ -167,7 +196,7 @@ export default function EditCampaignPage() {
         throw new Error("Failed to save campaign")
       }
 
-      // Show success message or redirect
+      console.log("[v0] Campaign saved successfully")
       router.push(`/campaigns/${campaign.id}`)
     } catch (error) {
       console.error("Failed to save campaign:", error)
@@ -252,6 +281,7 @@ export default function EditCampaignPage() {
   const handleCoverImageChange = useCallback(
     (files: File[]) => {
       if (files.length > 0) {
+        console.log("[v0] Cover image changed:", files[0].name)
         const url = URL.createObjectURL(files[0])
         updateCampaign({ coverImage: url })
       }
@@ -261,8 +291,11 @@ export default function EditCampaignPage() {
 
   const handleGalleryChange = useCallback(
     (files: File[]) => {
-      const urls = files.map((file) => URL.createObjectURL(file))
-      updateCampaign({ gallery: urls })
+      console.log("[v0] Gallery images changed:", files.length)
+      if (files.length > 0) {
+        const urls = files.map((file) => URL.createObjectURL(file))
+        updateCampaign({ gallery: urls })
+      }
     },
     [updateCampaign],
   )
@@ -356,7 +389,7 @@ export default function EditCampaignPage() {
           <div className="flex items-center space-x-2">
             <Button variant="outline" asChild>
               <Link href={`/campaigns/${campaign.id}`}>
-                <Eye className="h-4 w-4 mr-2" />
+                <ImageIcon className="h-4 w-4 mr-2" />
                 Preview
               </Link>
             </Button>
@@ -388,137 +421,256 @@ export default function EditCampaignPage() {
               </Button>
             </div>
 
+            {/* Tabs component with Basic Info, Media, and Reward Tiers */}
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-              <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="basic">Basic Info</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
-                <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-3 bg-muted/50 border border-primary/20">
+                <TabsTrigger
+                  value="basic"
+                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                >
+                  Basic Info
+                </TabsTrigger>
+                <TabsTrigger
+                  value="media"
+                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                >
+                  Media
+                </TabsTrigger>
+                <TabsTrigger
+                  value="tiers"
+                  className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                >
+                  Reward Tiers
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-6">
-                <Card>
+                <Card className="border-2 border-primary/20">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      <Edit3 className="h-5 w-5" />
+                      <span className="text-2xl">📄</span>
                       Campaign Details
                     </CardTitle>
-                    <CardDescription>Update your campaign's basic information</CardDescription>
+                    <CardDescription>Edit your campaign information</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
                     <div className="space-y-2">
-                      <Label htmlFor="title">Campaign Title</Label>
+                      <Label htmlFor="title">Campaign Title *</Label>
                       <Input
                         id="title"
                         value={campaign.title}
                         onChange={(e) => updateCampaign({ title: e.target.value })}
-                        placeholder="Enter campaign title"
+                        placeholder="Revolutionary VR Headset for Everyone"
+                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                       />
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="description">Short Description</Label>
+                      <Label htmlFor="description">Short Description *</Label>
                       <Textarea
                         id="description"
                         value={campaign.description}
                         onChange={(e) => updateCampaign({ description: e.target.value })}
-                        placeholder="Brief description of your campaign"
+                        placeholder="A brief description of your campaign"
                         rows={3}
+                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="story">Campaign Story *</Label>
+                      <RichEditor
+                        content={campaign.story}
+                        onChange={(content) => updateCampaign({ story: content })}
+                        placeholder="Tell your story. What makes your project special?"
+                        className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
                       />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="category">Category</Label>
+                        <Label htmlFor="category">Category *</Label>
                         <Select
                           value={campaign.category}
                           onValueChange={(value) => updateCampaign({ category: value })}
                         >
-                          <SelectTrigger>
-                            <SelectValue />
+                          <SelectTrigger className="border-2 border-border bg-zinc-800">
+                            <SelectValue placeholder="Select a category" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="Gaming">Gaming</SelectItem>
-                            <SelectItem value="Art">Art</SelectItem>
-                            <SelectItem value="VTuber">VTuber</SelectItem>
-                            <SelectItem value="Music">Music</SelectItem>
-                            <SelectItem value="Technology">Technology</SelectItem>
-                            <SelectItem value="Film">Film</SelectItem>
+                            <SelectItem value="technology">Technology</SelectItem>
+                            <SelectItem value="design">Design</SelectItem>
+                            <SelectItem value="games">Games</SelectItem>
+                            <SelectItem value="film">Film & Video</SelectItem>
+                            <SelectItem value="music">Music</SelectItem>
+                            <SelectItem value="art">Art</SelectItem>
+                            <SelectItem value="fashion">Fashion</SelectItem>
+                            <SelectItem value="food">Food</SelectItem>
+                            <SelectItem value="publishing">Publishing</SelectItem>
+                            <SelectItem value="crafts">Crafts</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="tags">Tags</Label>
+                        <Label htmlFor="tags">Tags (comma separated)</Label>
                         <Input
                           id="tags"
                           value={campaign.tags.join(", ")}
-                          onChange={(e) => updateCampaign({ tags: e.target.value.split(", ").filter(Boolean) })}
-                          placeholder="VR, Gaming, Cyberpunk"
+                          onChange={(e) => {
+                            const tags = e.target.value
+                              .split(",")
+                              .map((tag) => tag.trim())
+                              .filter(Boolean)
+                            updateCampaign({ tags })
+                          }}
+                          placeholder="VR, Gaming, Technology"
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                         />
                       </div>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Campaign Story</Label>
-                      <RichEditor
-                        content={campaign.story}
-                        onChange={(content) => updateCampaign({ story: content })}
-                        placeholder="Tell your campaign's story in detail..."
-                      />
-                    </div>
-                  </CardContent>
-                </Card>
+                    <Separator />
 
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Target className="h-5 w-5" />
-                      Funding Goals
-                    </CardTitle>
-                    <CardDescription>Set your funding target and timeline</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-6">
+                    {/* Social Links section */}
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label className="text-base font-semibold">Social Links</Label>
+                        <p className="text-sm text-muted-foreground">
+                          Add your social media links to help backers connect with you
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="website">Website</Label>
+                          <Input
+                            id="website"
+                            type="url"
+                            value={campaign.socialLinks?.website || ""}
+                            onChange={(e) =>
+                              updateCampaign({
+                                socialLinks: { ...campaign.socialLinks, website: e.target.value },
+                              })
+                            }
+                            placeholder="https://yourwebsite.com"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="x">X (Twitter)</Label>
+                          <Input
+                            id="x"
+                            type="url"
+                            value={campaign.socialLinks?.x || ""}
+                            onChange={(e) =>
+                              updateCampaign({
+                                socialLinks: { ...campaign.socialLinks, x: e.target.value },
+                              })
+                            }
+                            placeholder="https://x.com/yourhandle"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="instagram">Instagram</Label>
+                          <Input
+                            id="instagram"
+                            type="url"
+                            value={campaign.socialLinks?.instagram || ""}
+                            onChange={(e) =>
+                              updateCampaign({
+                                socialLinks: { ...campaign.socialLinks, instagram: e.target.value },
+                              })
+                            }
+                            placeholder="https://instagram.com/yourhandle"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="youtube">YouTube</Label>
+                          <Input
+                            id="youtube"
+                            type="url"
+                            value={campaign.socialLinks?.youtube || ""}
+                            onChange={(e) =>
+                              updateCampaign({
+                                socialLinks: { ...campaign.socialLinks, youtube: e.target.value },
+                              })
+                            }
+                            placeholder="https://youtube.com/@yourchannel"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tiktok">TikTok</Label>
+                          <Input
+                            id="tiktok"
+                            type="url"
+                            value={campaign.socialLinks?.tiktok || ""}
+                            onChange={(e) =>
+                              updateCampaign({
+                                socialLinks: { ...campaign.socialLinks, tiktok: e.target.value },
+                              })
+                            }
+                            placeholder="https://tiktok.com/@yourhandle"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator />
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="goalAmount">Funding Goal</Label>
-                        <div className="relative">
-                          <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="goalAmount"
-                            type="number"
-                            value={campaign.goalAmount}
-                            onChange={(e) => updateCampaign({ goalAmount: Number(e.target.value) })}
-                            className="pl-10"
-                            placeholder="50000"
-                          />
-                        </div>
+                        <Label htmlFor="goalAmount">Funding Goal (USD) *</Label>
+                        <Input
+                          id="goalAmount"
+                          type="number"
+                          value={campaign.goalAmount}
+                          onChange={(e) => updateCampaign({ goalAmount: Number(e.target.value) })}
+                          placeholder="50000"
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="endDate">Campaign End Date</Label>
-                        <div className="relative">
-                          <Calendar className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground z-10 pointer-events-none" />
-                          <Input
-                            id="endDate"
-                            type="date"
-                            value={campaign.endDate ? campaign.endDate.split("T")[0] : ""}
-                            onChange={(e) => handleEndDateChange(e.target.value)}
-                            className="pl-10"
-                            min={new Date().toISOString().split("T")[0]}
-                          />
-                        </div>
-                        <p className="text-sm text-muted-foreground">Duration: {campaign.duration} days</p>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Current Progress</Label>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>${campaign.raisedAmount.toLocaleString()} raised</span>
-                          <span>{Math.round(progressPercentage)}% of goal</span>
-                        </div>
-                        <Progress value={progressPercentage} className="h-2" />
+                        <Label htmlFor="endDate">Campaign End Date *</Label>
+                        <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
+                            >
+                              <CalendarIcon className="mr-2 h-4 w-4" />
+                              {campaign.endDate ? (
+                                format(new Date(campaign.endDate), "PPP")
+                              ) : (
+                                <span className="text-muted-foreground">Pick an end date</span>
+                              )}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={campaign.endDate ? new Date(campaign.endDate) : undefined}
+                              onSelect={(date) => {
+                                if (date) {
+                                  updateCampaign({ endDate: date.toISOString() })
+                                  setIsEndDateOpen(false)
+                                }
+                              }}
+                              disabled={(date) => date < new Date()}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                       </div>
                     </div>
                   </CardContent>
@@ -526,7 +678,7 @@ export default function EditCampaignPage() {
               </TabsContent>
 
               <TabsContent value="media" className="space-y-6">
-                <Card>
+                <Card className="border-2 border-primary/20">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <ImageIcon className="h-5 w-5" />
@@ -535,29 +687,41 @@ export default function EditCampaignPage() {
                     <CardDescription>Upload images and videos to showcase your campaign</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <MediaUpload
-                      type="image"
-                      title="Cover Image"
-                      description="Main image that represents your campaign (recommended: 1920x1080)"
-                      multiple={false}
-                      maxFiles={1}
-                      onFilesChange={handleCoverImageChange}
-                      enableCompression={true}
-                      initialFiles={campaign.coverImage ? [campaign.coverImage] : []}
-                    />
+                    <div className="space-y-2">
+                      <Label>Cover Image</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Main image that represents your campaign (recommended: 1920x1080)
+                      </p>
+                      <MediaUpload
+                        type="image"
+                        title=""
+                        description=""
+                        multiple={false}
+                        maxFiles={1}
+                        initialFiles={campaign.coverImage ? [campaign.coverImage] : []}
+                        onFilesChange={handleCoverImageChange}
+                        enableCompression={true}
+                      />
+                    </div>
 
                     <Separator />
 
-                    <MediaUpload
-                      type="image"
-                      title="Gallery Images"
-                      description="Additional images to showcase your project (up to 10 images)"
-                      multiple={true}
-                      maxFiles={10}
-                      onFilesChange={handleGalleryChange}
-                      enableCompression={true}
-                      initialFiles={campaign.gallery}
-                    />
+                    <div className="space-y-2">
+                      <Label>Gallery Images</Label>
+                      <p className="text-sm text-muted-foreground">
+                        Additional images to showcase your project (up to 10 images)
+                      </p>
+                      <MediaUpload
+                        type="image"
+                        title=""
+                        description=""
+                        multiple={true}
+                        maxFiles={10}
+                        initialFiles={campaign.gallery}
+                        onFilesChange={handleGalleryChange}
+                        enableCompression={true}
+                      />
+                    </div>
 
                     <Separator />
 
@@ -576,176 +740,110 @@ export default function EditCampaignPage() {
               </TabsContent>
 
               <TabsContent value="tiers" className="space-y-6">
-                <Card>
+                <Card className="border-2 border-primary/20">
                   <CardHeader>
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="flex items-center gap-2">
-                          <Users className="h-5 w-5" />
-                          Reward Tiers
-                        </CardTitle>
-                        <CardDescription>Create reward tiers for your backers</CardDescription>
+                        <CardTitle className="text-lg">Reward Tiers</CardTitle>
+                        <CardDescription>Manage reward tiers for your backers</CardDescription>
                       </div>
-                      <Button onClick={addTier}>
+                      <Button onClick={addTier} className="bg-primary hover:bg-primary/90">
                         <Plus className="h-4 w-4 mr-2" />
                         Add Tier
                       </Button>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {campaign.tiers.map((tier, index) => (
-                      <Card key={tier.id} className="relative">
-                        <CardHeader>
-                          <div className="flex items-center justify-between">
-                            <CardTitle className="text-lg">Tier {index + 1}</CardTitle>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeTier(tier.id)}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Tier Name</Label>
-                              <Input
-                                value={tier.title}
-                                onChange={(e) => updateTier(tier.id, { title: e.target.value })}
-                                placeholder="Early Bird"
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Pledge Amount</Label>
-                              <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  type="number"
-                                  value={tier.amount || ""}
-                                  onChange={(e) => {
-                                    const value = e.target.value === "" ? 0 : Number(e.target.value)
-                                    updateTier(tier.id, { amount: value })
-                                  }}
-                                  onFocus={(e) => {
-                                    if (e.target.value === "0") {
-                                      e.target.select()
-                                    }
-                                  }}
-                                  className="pl-10"
-                                  placeholder="25"
-                                  min="0"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Description</Label>
-                            <Textarea
-                              value={tier.description}
-                              onChange={(e) => updateTier(tier.id, { description: e.target.value })}
-                              placeholder="What backers get with this tier"
-                              rows={2}
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Rewards</Label>
-                            <Textarea
-                              value={tier.rewards.join("\n")}
-                              onChange={(e) =>
-                                updateTier(tier.id, { rewards: e.target.value.split("\n").filter(Boolean) })
-                              }
-                              placeholder="Digital copy of the game&#10;Early access beta&#10;Digital soundtrack"
-                              rows={3}
-                            />
-                            <p className="text-sm text-muted-foreground">One reward per line</p>
-                          </div>
-
-                          <div className="flex items-center space-x-4">
-                            <div className="flex items-center space-x-2">
-                              <Switch
-                                checked={tier.isLimited}
-                                onCheckedChange={(checked) => updateTier(tier.id, { isLimited: checked })}
-                              />
-                              <Label>Limited quantity</Label>
-                            </div>
-
-                            {tier.isLimited && (
-                              <div className="space-y-2">
-                                <Input
-                                  type="number"
-                                  value={tier.maxBackers || ""}
-                                  onChange={(e) =>
-                                    updateTier(tier.id, { maxBackers: Number(e.target.value) || undefined })
-                                  }
-                                  placeholder="Max backers"
-                                  className="w-32"
-                                />
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Estimated Delivery</Label>
-                              <Input
-                                type="date"
-                                value={tier.estimatedDelivery || ""}
-                                onChange={(e) => updateTier(tier.id, { estimatedDelivery: e.target.value })}
-                              />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Shipping Cost (Optional)</Label>
-                              <div className="relative">
-                                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                  type="number"
-                                  value={tier.shippingCost || ""}
-                                  onChange={(e) =>
-                                    updateTier(tier.id, { shippingCost: Number(e.target.value) || undefined })
-                                  }
-                                  className="pl-10"
-                                  placeholder="0"
-                                />
-                              </div>
-                            </div>
-                          </div>
+                    {campaign.tiers.length === 0 ? (
+                      <Card className="border-dashed border-2">
+                        <CardContent className="pt-6 text-center">
+                          <span className="text-6xl mb-4 block">🎁</span>
+                          <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
+                          <p className="text-muted-foreground mb-4">
+                            Create reward tiers to incentivize backers and offer value for their support.
+                          </p>
+                          <Button onClick={addTier} className="bg-primary hover:bg-primary/90">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Create Your First Tier
+                          </Button>
                         </CardContent>
                       </Card>
-                    ))}
+                    ) : (
+                      <div className="space-y-6">
+                        {campaign.tiers.map((tier) => (
+                          <Card key={tier.id} className="border-2 border-border">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                              <CardTitle className="text-lg">Reward Tier</CardTitle>
+                              <Button variant="ghost" size="sm" onClick={() => removeTier(tier.id)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Title *</Label>
+                                  <Input
+                                    value={tier.title}
+                                    onChange={(e) => updateTier(tier.id, { title: e.target.value })}
+                                    placeholder="Early Bird Special"
+                                    className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                  />
+                                </div>
+                                <div className="space-y-2">
+                                  <Label>Amount (USD) *</Label>
+                                  <Input
+                                    type="number"
+                                    value={tier.amount}
+                                    onChange={(e) => updateTier(tier.id, { amount: Number(e.target.value) })}
+                                    placeholder="25"
+                                    className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                  />
+                                </div>
+                              </div>
 
-                    {campaign.tiers.length === 0 && (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                        <p>No reward tiers yet. Add your first tier to get started.</p>
+                              <div className="space-y-2">
+                                <Label>Description *</Label>
+                                <Textarea
+                                  value={tier.description}
+                                  onChange={(e) => updateTier(tier.id, { description: e.target.value })}
+                                  placeholder="What backers will receive for this pledge amount"
+                                  rows={3}
+                                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                />
+                              </div>
+
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                  <Label>Limited Quantity</Label>
+                                  <div className="flex items-center space-x-3 p-4 rounded-lg border-2 border-border bg-zinc-800/50">
+                                    <Switch
+                                      checked={tier.isLimited}
+                                      onCheckedChange={(checked) => updateTier(tier.id, { isLimited: checked })}
+                                    />
+                                    <Label className="cursor-pointer flex-1 text-sm font-medium">
+                                      {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
+                                    </Label>
+                                  </div>
+                                  {tier.isLimited && (
+                                    <Input
+                                      type="number"
+                                      value={tier.maxBackers || ""}
+                                      onChange={(e) => updateTier(tier.id, { maxBackers: Number(e.target.value) })}
+                                      placeholder="100"
+                                      className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
                       </div>
                     )}
                   </CardContent>
                 </Card>
               </TabsContent>
             </Tabs>
-
-            <div className="mt-6 flex justify-end">
-              <Button onClick={handleSave} disabled={saving} size="lg" className="bg-primary hover:bg-primary/90">
-                {saving ? (
-                  <>
-                    <Clock className="h-4 w-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="h-4 w-4 mr-2" />
-                    Save Changes
-                  </>
-                )}
-              </Button>
-            </div>
           </div>
 
           {/* Sidebar */}
@@ -783,12 +881,12 @@ export default function EditCampaignPage() {
 
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Raised</span>
+                    <span className="text-green-600 dark:text-green-400 font-medium">Raised</span>
                     <span className="font-medium">${campaign.raisedAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Goal</span>
-                    <span>${campaign.goalAmount.toLocaleString()}</span>
+                    <span className="text-blue-600 dark:text-blue-400 font-medium">Goal</span>
+                    <span className="font-medium">${campaign.goalAmount.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Duration</span>
@@ -806,7 +904,7 @@ export default function EditCampaignPage() {
               <CardContent className="space-y-2">
                 <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
                   <Link href={`/campaigns/${campaign.id}`}>
-                    <Eye className="h-4 w-4 mr-2" />
+                    <ImageIcon className="h-4 w-4 mr-2" />
                     View Campaign
                   </Link>
                 </Button>
@@ -818,7 +916,7 @@ export default function EditCampaignPage() {
                 </Button>
                 <Button variant="outline" size="sm" className="w-full justify-start bg-transparent" asChild>
                   <Link href="/dashboard">
-                    <Settings className="h-4 w-4 mr-2" />
+                    <ImageIcon className="h-4 w-4 mr-2" />
                     Dashboard
                   </Link>
                 </Button>

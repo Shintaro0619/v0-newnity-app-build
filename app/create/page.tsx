@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef } from "react"
 import { useAccount } from "wagmi"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -34,10 +34,19 @@ interface CampaignData {
     description: string
     category: string
     tags: string[]
+    socialLinks: {
+      website: string
+      x: string
+      instagram: string
+      youtube: string
+      tiktok: string
+    }
   }
   media: {
     mainImage: File | null
+    mainImageUrl: string // Added to store image URL
     gallery: File[]
+    galleryUrls: string[] // Added to store gallery URLs
     video: File | null
     youtubeUrl: string
   }
@@ -82,10 +91,19 @@ const initialCampaignData: CampaignData = {
     description: "",
     category: "",
     tags: [],
+    socialLinks: {
+      website: "",
+      x: "",
+      instagram: "",
+      youtube: "",
+      tiktok: "",
+    },
   },
   media: {
     mainImage: null,
+    mainImageUrl: "", // Initialize mainImageUrl
     gallery: [],
+    galleryUrls: [], // Initialize galleryUrls
     video: null,
     youtubeUrl: "",
   },
@@ -128,6 +146,7 @@ export default function CreateCampaignPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
+  const rewardTiersEndRef = useRef<HTMLDivElement>(null)
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -165,7 +184,7 @@ export default function CreateCampaignPage() {
     }
 
     return (
-      <Card>
+      <Card className="border-2 border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-lg">Reward Tier</CardTitle>
           <Button variant="ghost" size="sm" onClick={onDelete}>
@@ -181,6 +200,7 @@ export default function CreateCampaignPage() {
                 onChange={(e) => setLocalTitle(e.target.value)}
                 onBlur={handleTitleBlur}
                 placeholder="Early Bird Special"
+                className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
               />
             </div>
             <div className="space-y-2">
@@ -193,7 +213,7 @@ export default function CreateCampaignPage() {
                   onChange={(e) => setLocalAmount(Number(e.target.value))}
                   onBlur={handleAmountBlur}
                   placeholder="25"
-                  className="pl-10"
+                  className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                 />
               </div>
             </div>
@@ -206,7 +226,7 @@ export default function CreateCampaignPage() {
               onChange={setLocalDescription}
               onBlur={handleDescriptionBlur}
               placeholder="What backers will receive for this pledge amount. Use formatting to highlight key benefits and features."
-              className="min-h-[120px]"
+              className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
             />
           </div>
 
@@ -215,7 +235,10 @@ export default function CreateCampaignPage() {
               <Label>Estimated Delivery</Label>
               <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-start text-left font-normal bg-transparent">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
+                  >
                     <span className="mr-2">📅</span>
                     {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
                   </Button>
@@ -237,12 +260,16 @@ export default function CreateCampaignPage() {
               </Popover>
             </div>
             <div className="space-y-2">
-              <div className="flex items-center space-x-2">
+              <Label className="text-base font-semibold">Limited Quantity</Label>
+              <div className="flex items-center space-x-3 p-4 rounded-lg border-2 border-border bg-zinc-800/50 hover:bg-zinc-800/70 transition-colors">
                 <Switch
                   checked={tier.isLimited}
                   onCheckedChange={(checked) => onUpdate({ ...tier, isLimited: checked })}
+                  className="data-[state=checked]:bg-primary scale-125"
                 />
-                <Label>Limited Quantity</Label>
+                <Label className="cursor-pointer flex-1 text-sm font-medium">
+                  {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
+                </Label>
               </div>
               {tier.isLimited && (
                 <Input
@@ -250,6 +277,7 @@ export default function CreateCampaignPage() {
                   value={tier.quantity || ""}
                   onChange={(e) => onUpdate({ ...tier, quantity: Number(e.target.value) || null })}
                   placeholder="100"
+                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                 />
               )}
             </div>
@@ -363,6 +391,9 @@ export default function CreateCampaignPage() {
       ...prev,
       rewards: [...prev.rewards, newTier],
     }))
+    setTimeout(() => {
+      rewardTiersEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
+    }, 100)
   }
 
   const updateRewardTier = (index: number, updatedTier: RewardTier) => {
@@ -443,19 +474,20 @@ export default function CreateCampaignPage() {
   const handleSubmit = async () => {
     const allErrors: Record<string, string> = {}
 
-    if (!campaignData.basic.title) allErrors.title = "Campaign title is required"
-    if (!campaignData.basic.subtitle) allErrors.subtitle = "Subtitle is required"
-    if (!campaignData.basic.description) allErrors.description = "Description is required"
-    if (!campaignData.basic.category) allErrors.category = "Category is required"
-    if (!campaignData.media.mainImage) allErrors.mainImage = "Main campaign image is required"
+    if (!campaignData.basic.title) allErrors.title = "Required: Please enter a campaign title"
+    if (!campaignData.basic.subtitle) allErrors.subtitle = "Required: Please enter a subtitle"
+    if (!campaignData.basic.description) allErrors.description = "Required: Please enter a description"
+    if (!campaignData.basic.category) allErrors.category = "Required: Please select a category"
+    if (!campaignData.media.mainImage && !campaignData.media.mainImageUrl)
+      allErrors.mainImage = "Required: Please upload a main image"
     if (!campaignData.funding.goal || campaignData.funding.goal <= 0) {
-      allErrors.goal = "Funding goal must be greater than 0"
+      allErrors.goal = "Required: Please enter a funding goal (greater than 0)"
     }
     if (!campaignData.funding.endDate) {
-      allErrors.endDate = "Campaign end date is required"
+      allErrors.endDate = "Required: Please select a campaign end date"
     }
     if (campaignData.rewards.length === 0) {
-      allErrors.rewards = "At least one reward tier is required"
+      allErrors.rewards = "Required: Please create at least one reward tier"
     }
 
     if (Object.keys(allErrors).length > 0) {
@@ -469,7 +501,11 @@ export default function CreateCampaignPage() {
     }
 
     if (!isConnected || !address) {
-      setErrors({ wallet: "Please connect your wallet to create the campaign" })
+      setErrors({
+        wallet:
+          "Wallet connection required. Please connect your wallet using the 'Connect Wallet' button in the header.",
+      })
+      window.scrollTo({ top: 0, behavior: "smooth" })
       return
     }
 
@@ -539,7 +575,7 @@ export default function CreateCampaignPage() {
       const result = await response.json()
       console.log("[v0] Campaign created successfully:", result)
 
-      router.push("/dashboard")
+      router.push(`/dashboard?newCampaign=${result.campaign.id}`)
     } catch (error) {
       console.error("[v0] Campaign creation failed:", error)
       setErrors({ submit: error instanceof Error ? error.message : "Failed to create campaign" })
@@ -561,14 +597,22 @@ export default function CreateCampaignPage() {
   const handleMainImageChange = useCallback((files: File[]) => {
     setCampaignData((prev) => ({
       ...prev,
-      media: { ...prev.media, mainImage: files[0] || null },
+      media: {
+        ...prev.media,
+        mainImage: files[0] || null,
+        mainImageUrl: files[0] ? URL.createObjectURL(files[0]) : prev.media.mainImageUrl, // Store URL
+      },
     }))
   }, [])
 
   const handleGalleryChange = useCallback((files: File[]) => {
     setCampaignData((prev) => ({
       ...prev,
-      media: { ...prev.media, gallery: files },
+      media: {
+        ...prev.media,
+        gallery: files,
+        galleryUrls: files.map((f) => URL.createObjectURL(f)), // Store URLs
+      },
     }))
   }, [])
 
@@ -607,31 +651,41 @@ export default function CreateCampaignPage() {
             </Button>
           </div>
 
-          {/* Wallet Connection Alert */}
           {!isConnected && (
-            <Alert>
+            <Alert className="border-2 border-yellow-500/50 bg-yellow-500/10">
               <div className="flex items-center gap-3 col-span-2">
-                <span className="text-lg flex-shrink-0">👛</span>
+                <span className="text-2xl flex-shrink-0">⚠️</span>
                 <div className="flex-1">
-                  <p className="font-semibold mb-2">Wallet Connection Required</p>
-                  <p className="text-sm mb-2">
-                    To create your campaign, you'll need to connect your wallet. This allows you to deploy your campaign
-                    to the blockchain and receive funds.
+                  <p className="font-bold text-lg mb-2 text-yellow-600 dark:text-yellow-400">
+                    Wallet Connection Required
                   </p>
-                  <p className="text-sm text-muted-foreground">
-                    Please use the "Connect Wallet" button in the header to connect your wallet.
+                  <p className="text-sm mb-2">
+                    To create your campaign, you need to connect your wallet. This allows you to deploy your campaign to
+                    the blockchain and receive funds.
+                  </p>
+                  <p className="text-sm font-semibold text-yellow-700 dark:text-yellow-300">
+                    👉 Please click the "Connect Wallet" button in the header to connect your wallet
                   </p>
                 </div>
               </div>
             </Alert>
           )}
 
+          {errors.wallet && (
+            <Alert className="border-2 border-destructive bg-destructive/10">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl flex-shrink-0">❌</span>
+                <p className="text-sm font-semibold text-destructive">{errors.wallet}</p>
+              </div>
+            </Alert>
+          )}
+
           {isConnected && address && (
-            <Alert>
+            <Alert className="border-2 border-green-500/50 bg-green-500/10">
               <div className="flex items-center gap-3 col-span-2">
-                <span className="text-lg flex-shrink-0">✅</span>
+                <span className="text-2xl flex-shrink-0">✅</span>
                 <div className="flex-1">
-                  <p className="font-semibold mb-1">Wallet Connected</p>
+                  <p className="font-semibold mb-1 text-green-600 dark:text-green-400">Wallet Connected</p>
                   <p className="text-sm font-mono">
                     {address.slice(0, 6)}...{address.slice(-4)}
                   </p>
@@ -672,7 +726,7 @@ export default function CreateCampaignPage() {
                 </TabsList>
 
                 <TabsContent value="basic" className="space-y-6">
-                  <Card className="border-primary/20">
+                  <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <span className="text-2xl">📄</span>
@@ -693,9 +747,9 @@ export default function CreateCampaignPage() {
                             }))
                           }
                           placeholder="Revolutionary VR Headset for Everyone"
-                          className={errors.title ? "border-destructive" : ""}
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                         />
-                        {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
+                        {errors.title && <p className="text-sm font-semibold text-destructive">{errors.title}</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -710,9 +764,9 @@ export default function CreateCampaignPage() {
                             }))
                           }
                           placeholder="Immersive virtual reality at an affordable price"
-                          className={errors.subtitle ? "border-destructive" : ""}
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                         />
-                        {errors.subtitle && <p className="text-sm text-destructive">{errors.subtitle}</p>}
+                        {errors.subtitle && <p className="text-sm font-semibold text-destructive">{errors.subtitle}</p>}
                       </div>
 
                       <div className="space-y-2">
@@ -726,9 +780,11 @@ export default function CreateCampaignPage() {
                             }))
                           }
                           placeholder="Tell your story. What makes your project special? What problem does it solve? Use rich formatting to make your description engaging and professional."
-                          className={errors.description ? "border-destructive" : ""}
+                          className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
                         />
-                        {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
+                        {errors.description && (
+                          <p className="text-sm font-semibold text-destructive">{errors.description}</p>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -743,7 +799,7 @@ export default function CreateCampaignPage() {
                               }))
                             }
                           >
-                            <SelectTrigger className={errors.category ? "border-destructive" : ""}>
+                            <SelectTrigger className="border-2 border-border bg-zinc-800">
                               <SelectValue placeholder="Select a category" />
                             </SelectTrigger>
                             <SelectContent>
@@ -754,7 +810,9 @@ export default function CreateCampaignPage() {
                               ))}
                             </SelectContent>
                           </Select>
-                          {errors.category && <p className="text-sm text-destructive">{errors.category}</p>}
+                          {errors.category && (
+                            <p className="text-sm font-semibold text-destructive">{errors.category}</p>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -763,19 +821,16 @@ export default function CreateCampaignPage() {
                             id="tags"
                             value={campaignData.basic.tags.join(", ")}
                             onChange={(e) => {
-                              // Store the raw value without splitting immediately
-                              // This allows users to type commas freely
                               const value = e.target.value
                               setCampaignData((prev) => ({
                                 ...prev,
                                 basic: {
                                   ...prev.basic,
-                                  tags: value ? [value] : [], // Store as single string temporarily
+                                  tags: value ? [value] : [],
                                 },
                               }))
                             }}
                             onBlur={(e) => {
-                              // Split tags only when user finishes editing (on blur)
                               const value = e.target.value
                               const tags = value
                                 .split(",")
@@ -787,10 +842,124 @@ export default function CreateCampaignPage() {
                               }))
                             }}
                             placeholder="VR, Gaming, Technology"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                           />
                           <p className="text-xs text-muted-foreground">
                             Separate tags with commas (e.g., VR, Gaming, Technology)
                           </p>
+                        </div>
+                      </div>
+
+                      <Separator className="my-6" />
+
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label className="text-base font-semibold">Social Links</Label>
+                          <p className="text-sm text-muted-foreground">
+                            Add your social media links to help backers connect with you
+                          </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="website">Website</Label>
+                            <Input
+                              id="website"
+                              type="url"
+                              value={campaignData.basic.socialLinks.website}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    socialLinks: { ...prev.basic.socialLinks, website: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder="https://yourwebsite.com"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="x">X (Twitter)</Label>
+                            <Input
+                              id="x"
+                              type="url"
+                              value={campaignData.basic.socialLinks.x}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    socialLinks: { ...prev.basic.socialLinks, x: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder="https://x.com/yourhandle"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="instagram">Instagram</Label>
+                            <Input
+                              id="instagram"
+                              type="url"
+                              value={campaignData.basic.socialLinks.instagram}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    socialLinks: { ...prev.basic.socialLinks, instagram: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder="https://instagram.com/yourhandle"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="youtube">YouTube</Label>
+                            <Input
+                              id="youtube"
+                              type="url"
+                              value={campaignData.basic.socialLinks.youtube}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    socialLinks: { ...prev.basic.socialLinks, youtube: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder="https://youtube.com/@yourchannel"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="tiktok">TikTok</Label>
+                            <Input
+                              id="tiktok"
+                              type="url"
+                              value={campaignData.basic.socialLinks.tiktok}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    socialLinks: { ...prev.basic.socialLinks, tiktok: e.target.value },
+                                  },
+                                }))
+                              }
+                              placeholder="https://tiktok.com/@yourhandle"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -798,7 +967,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="media" className="space-y-6">
-                  <Card className="border-primary/20">
+                  <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <ImageIcon className="h-5 w-5" />
@@ -824,10 +993,13 @@ export default function CreateCampaignPage() {
                         maxSize={10 * 1024 * 1024}
                         enableCompression={true}
                         showPreview={true}
+                        initialFiles={campaignData.media.mainImageUrl ? [campaignData.media.mainImageUrl] : []} // Pass initialFiles
                         onFilesChange={handleMainImageChange}
                         onError={handleMediaError}
                       />
-                      {errors.mainImage && <p className="text-sm text-destructive">{errors.mainImage}</p>}
+                      {errors.mainImage && !campaignData.media.mainImage && !campaignData.media.mainImageUrl && (
+                        <p className="text-sm font-semibold text-destructive">{errors.mainImage}</p>
+                      )}
 
                       <Separator />
 
@@ -840,6 +1012,7 @@ export default function CreateCampaignPage() {
                         maxSize={10 * 1024 * 1024}
                         enableCompression={true}
                         showPreview={true}
+                        initialFiles={campaignData.media.galleryUrls} // Pass initialFiles
                         onFilesChange={handleGalleryChange}
                         onError={handleMediaError}
                       />
@@ -869,6 +1042,7 @@ export default function CreateCampaignPage() {
                               }))
                             }
                             placeholder="https://www.youtube.com/watch?v=..."
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                           />
                           <p className="text-xs text-muted-foreground">
                             Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/shorts
@@ -906,7 +1080,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="funding" className="space-y-6">
-                  <Card className="border-primary/20">
+                  <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Target className="h-5 w-5" />
@@ -932,10 +1106,10 @@ export default function CreateCampaignPage() {
                                 }))
                               }}
                               placeholder="50000"
-                              className={`pl-10 ${errors.goal ? "border-destructive" : ""}`}
+                              className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                             />
                           </div>
-                          {errors.goal && <p className="text-sm text-destructive">{errors.goal}</p>}
+                          {errors.goal && <p className="text-sm font-semibold text-destructive">{errors.goal}</p>}
                           <p className="text-xs text-muted-foreground">
                             Set a realistic goal based on your project needs
                           </p>
@@ -947,7 +1121,7 @@ export default function CreateCampaignPage() {
                             <PopoverTrigger asChild>
                               <Button
                                 variant="outline"
-                                className={`w-full justify-start text-left font-normal ${errors.endDate ? "border-destructive" : ""}`}
+                                className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
                               >
                                 <CalendarIcon className="mr-2 h-4 w-4" />
                                 {campaignData.funding.endDate ? (
@@ -975,7 +1149,7 @@ export default function CreateCampaignPage() {
                               />
                             </PopoverContent>
                           </Popover>
-                          {errors.endDate && <p className="text-sm text-destructive">{errors.endDate}</p>}
+                          {errors.endDate && <p className="text-sm font-semibold text-destructive">{errors.endDate}</p>}
                           <p className="text-xs text-muted-foreground">
                             Campaign will end at 23:59:59 UTC on the selected day. Most successful campaigns run for
                             30-60 days.
@@ -998,7 +1172,7 @@ export default function CreateCampaignPage() {
                                 }))
                               }}
                               placeholder="1"
-                              className="pl-10"
+                              className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                             />
                           </div>
                           <p className="text-xs text-muted-foreground">Minimum amount backers can pledge</p>
@@ -1015,7 +1189,7 @@ export default function CreateCampaignPage() {
                               }))
                             }
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="border-2 border-border bg-zinc-800">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1042,7 +1216,7 @@ export default function CreateCampaignPage() {
                 </TabsContent>
 
                 <TabsContent value="tiers" className="space-y-6">
-                  <Card className="border-primary/20">
+                  <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
@@ -1052,7 +1226,7 @@ export default function CreateCampaignPage() {
                           </CardTitle>
                           <CardDescription>Create reward tiers for your backers</CardDescription>
                         </div>
-                        <Button onClick={addRewardTier}>
+                        <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
                           <Plus className="h-4 w-4 mr-2" />
                           Add Tier
                         </Button>
@@ -1060,10 +1234,10 @@ export default function CreateCampaignPage() {
                     </CardHeader>
                     <CardContent className="space-y-6">
                       {errors.rewards && (
-                        <Alert>
+                        <Alert className="border-2 border-destructive bg-destructive/10">
                           <div className="flex items-center gap-3">
-                            <span className="text-lg flex-shrink-0">⚠️</span>
-                            <p className="text-sm">{errors.rewards}</p>
+                            <span className="text-2xl flex-shrink-0">⚠️</span>
+                            <p className="text-sm font-semibold text-destructive">{errors.rewards}</p>
                           </div>
                         </Alert>
                       )}
@@ -1077,16 +1251,17 @@ export default function CreateCampaignPage() {
                             onDelete={() => deleteRewardTier(index)}
                           />
                         ))}
+                        <div ref={rewardTiersEndRef} />
 
                         {campaignData.rewards.length === 0 && (
-                          <Card className="border-dashed">
+                          <Card className="border-dashed border-2">
                             <CardContent className="pt-6 text-center">
                               <span className="text-6xl mb-4 block">🎁</span>
                               <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
                               <p className="text-muted-foreground mb-4">
                                 Create reward tiers to incentivize backers and offer value for their support.
                               </p>
-                              <Button onClick={addRewardTier}>
+                              <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Create Your First Tier
                               </Button>
@@ -1104,8 +1279,13 @@ export default function CreateCampaignPage() {
                 <Button variant="outline" asChild>
                   <Link href="/dashboard">Cancel</Link>
                 </Button>
-                <Button onClick={handleSubmit} disabled={loading || !isConnected} size="lg">
-                  {loading ? "Creating Campaign..." : "Create Campaign"}
+                <Button
+                  onClick={handleSubmit}
+                  disabled={loading || !isConnected}
+                  size="lg"
+                  className={!isConnected ? "opacity-50 cursor-not-allowed" : ""}
+                >
+                  {loading ? "Creating Campaign..." : !isConnected ? "Connect Wallet to Create" : "Create Campaign"}
                   <Save className="h-4 w-4 ml-2" />
                 </Button>
               </div>

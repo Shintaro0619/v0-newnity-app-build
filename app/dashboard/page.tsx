@@ -1,16 +1,18 @@
 "use client"
 
 import { useAccount } from "wagmi"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
+import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { DollarSign, Users, Heart, Target, Award, Plus, Clock, AlertCircle } from "lucide-react"
+import { DollarSign, Users, Heart, Target, Award, Plus, Clock, AlertCircle, TriangleAlert } from "lucide-react"
 import Link from "next/link"
 import { getCampaignsByCreator, getCampaignsByBacker, getUserPledgeStats } from "@/lib/actions/campaigns"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { formatCurrency, formatPercentage } from "@/lib/utils"
 
 interface Pledge {
   id: string
@@ -102,6 +104,9 @@ const pieData = [
 
 export default function DashboardPage() {
   const { address } = useAccount()
+  const searchParams = useSearchParams()
+  const newCampaignId = searchParams.get("newCampaign")
+  const campaignSectionRef = useRef<HTMLDivElement>(null)
   const [pledges, setPledges] = useState<Pledge[]>([])
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [backedCampaigns, setBackedCampaigns] = useState<Campaign[]>([])
@@ -118,6 +123,14 @@ export default function DashboardPage() {
       loadDashboardData()
     }
   }, [address])
+
+  useEffect(() => {
+    if (newCampaignId && !loading) {
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: "smooth" })
+      }, 100)
+    }
+  }, [newCampaignId, loading])
 
   async function loadDashboardData() {
     setLoading(true)
@@ -252,7 +265,7 @@ export default function DashboardPage() {
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">${stats.totalPledged}</div>
+              <div className="text-2xl font-bold text-primary">${formatCurrency(stats.totalPledged)}</div>
               <p className="text-xs text-muted-foreground">+12% from last month</p>
             </CardContent>
           </Card>
@@ -285,14 +298,14 @@ export default function DashboardPage() {
               <Award className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-primary">{stats.successRate.toFixed(2)}%</div>
+              <div className="text-2xl font-bold text-primary">{formatPercentage(stats.successRate)}%</div>
               <p className="text-xs text-muted-foreground">Above platform average</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Main Content */}
-        <Card>
+        <Card ref={campaignSectionRef}>
           <CardHeader>
             <CardTitle>My Campaigns</CardTitle>
             <CardDescription>Campaigns you've created and their performance</CardDescription>
@@ -319,33 +332,46 @@ export default function DashboardPage() {
                   const isFailed = campaign.status === "FAILED"
 
                   return (
-                    <div key={campaign.id} className="border rounded-lg p-6">
-                      {canFinalize && (
-                        <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-950">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Action Required:</strong> This campaign has reached its deadline. Click "View
-                            Campaign" to finalize it.
-                          </AlertDescription>
-                        </Alert>
+                    <div
+                      key={campaign.id}
+                      className="border-2 border-zinc-700 dark:border-zinc-600 rounded-lg p-6 shadow-sm"
+                    >
+                      {isDraft && isNotDeployed && (
+                        <div className="w-full rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-4 mb-4">
+                          <div className="flex items-start gap-3">
+                            <TriangleAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                            <div className="flex-1">
+                              <p className="font-medium text-amber-900 dark:text-amber-100">Campaign not live</p>
+                              <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed whitespace-normal break-words">
+                                This campaign is saved as a draft. Deploy it to the blockchain to make it live and start
+                                accepting pledges.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
                       )}
 
-                      {isDraft && isNotDeployed && (
-                        <Alert className="mb-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-950">
-                          <span className="text-lg mr-2">⚠️</span>
-                          <AlertDescription>
-                            <strong>Campaign Not Live:</strong> This campaign is saved as a draft. Deploy it to the
-                            blockchain to make it live and start accepting pledges.
-                          </AlertDescription>
+                      {canFinalize && (
+                        <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-950">
+                          <div className="flex items-center gap-3">
+                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                            <AlertDescription className="flex-1">
+                              <strong>Action Required:</strong> This campaign has reached its deadline. Click "View
+                              Campaign" to finalize it.
+                            </AlertDescription>
+                          </div>
                         </Alert>
                       )}
 
                       {isFunded && (
                         <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-950">
-                          <span className="text-lg mr-2">✅</span>
-                          <AlertDescription>
-                            <strong>Campaign Successful!</strong> Funds have been automatically released to your wallet.
-                          </AlertDescription>
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg flex-shrink-0">✅</span>
+                            <AlertDescription className="flex-1">
+                              <strong>Campaign Successful!</strong> Funds have been automatically released to your
+                              wallet.
+                            </AlertDescription>
+                          </div>
                         </Alert>
                       )}
 
@@ -359,12 +385,12 @@ export default function DashboardPage() {
                           <div>
                             <h3 className="text-xl font-semibold">{campaign.title}</h3>
                             <p className="text-muted-foreground line-clamp-2">{campaign.description}</p>
-                            <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                              <span className="flex items-center">
+                            <div className="flex items-center space-x-4 mt-2 text-sm">
+                              <span className="flex items-center text-purple-600 dark:text-purple-400 font-medium">
                                 <Users className="h-4 w-4 mr-1" />
                                 {campaign.backers_count} backers
                               </span>
-                              <span className="flex items-center">
+                              <span className="flex items-center text-orange-600 dark:text-orange-400 font-medium">
                                 <Clock className="h-4 w-4 mr-1" />
                                 {deadlinePassed ? "Ended" : `${daysLeft} days left`}
                               </span>
@@ -388,8 +414,12 @@ export default function DashboardPage() {
 
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span>${Number(campaign.raised_amount).toLocaleString()} raised</span>
-                          <span>${Number(campaign.goal_amount).toLocaleString()} goal</span>
+                          <span className="text-green-600 dark:text-green-400 font-medium">
+                            ${formatCurrency(Number(campaign.raised_amount))} raised
+                          </span>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            ${formatCurrency(Number(campaign.goal_amount))} goal
+                          </span>
                         </div>
                         <Progress value={progressPercentage} className="h-2" />
                         <p className="text-xs text-muted-foreground">{Math.round(progressPercentage)}% funded</p>
@@ -441,14 +471,19 @@ export default function DashboardPage() {
                   const canClaimRefund = isFailed && deadlinePassed
 
                   return (
-                    <div key={campaign.id} className="border rounded-lg p-6">
+                    <div
+                      key={campaign.id}
+                      className="border-2 border-zinc-700 dark:border-zinc-600 rounded-lg p-6 shadow-sm"
+                    >
                       {canClaimRefund && (
                         <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950">
-                          <AlertCircle className="h-4 w-4" />
-                          <AlertDescription>
-                            <strong>Refund Available:</strong> This campaign did not reach its goal. You can claim your
-                            refund.
-                          </AlertDescription>
+                          <div className="flex items-center gap-3">
+                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+                            <AlertDescription className="flex-1">
+                              <strong>Refund Available:</strong> This campaign did not reach its goal. You can claim
+                              your refund.
+                            </AlertDescription>
+                          </div>
                         </Alert>
                       )}
 
@@ -462,18 +497,18 @@ export default function DashboardPage() {
                           <div>
                             <h3 className="text-xl font-semibold">{campaign.title}</h3>
                             <p className="text-muted-foreground line-clamp-2">{campaign.description}</p>
-                            <div className="flex items-center space-x-4 mt-2 text-sm text-muted-foreground">
-                              <span className="flex items-center">
+                            <div className="flex items-center space-x-4 mt-2 text-sm">
+                              <span className="flex items-center text-purple-600 dark:text-purple-400 font-medium">
                                 <Users className="h-4 w-4 mr-1" />
                                 {campaign.backers_count} backers
                               </span>
-                              <span className="flex items-center">
+                              <span className="flex items-center text-orange-600 dark:text-orange-400 font-medium">
                                 <Clock className="h-4 w-4 mr-1" />
                                 {deadlinePassed ? "Ended" : `${daysLeft} days left`}
                               </span>
-                              <span className="flex items-center font-medium text-primary">
-                                <Heart className="h-4 w-4 mr-1 fill-primary" />
-                                You pledged ${Number(campaign.myPledgeAmount || 0).toLocaleString()}
+                              <span className="flex items-center font-medium text-pink-600 dark:text-pink-400">
+                                <Heart className="h-4 w-4 mr-1 fill-current" />
+                                You pledged ${formatCurrency(Number(campaign.myPledgeAmount || 0))}
                               </span>
                             </div>
                           </div>
@@ -490,8 +525,12 @@ export default function DashboardPage() {
 
                       <div className="space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span>${Number(campaign.raised_amount).toLocaleString()} raised</span>
-                          <span>${Number(campaign.goal_amount).toLocaleString()} goal</span>
+                          <span className="text-green-600 dark:text-green-400 font-medium">
+                            ${formatCurrency(Number(campaign.raised_amount))} raised
+                          </span>
+                          <span className="text-blue-600 dark:text-blue-400 font-medium">
+                            ${formatCurrency(Number(campaign.goal_amount))} goal
+                          </span>
                         </div>
                         <Progress value={progressPercentage} className="h-2" />
                         <p className="text-xs text-muted-foreground">{Math.round(progressPercentage)}% funded</p>

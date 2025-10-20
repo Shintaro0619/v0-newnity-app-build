@@ -103,6 +103,7 @@
     "react-resizable-panels": "^2.1.7",
     "react-toastify": "latest",
     "recharts": "2.15.4",
+    "sanitize-html": "latest",
     "solidity-coverage": "latest",
     "sonner": "latest",
     "tailwind-merge": "^2.5.5",

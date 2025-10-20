@@ -200,6 +200,12 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
 
           console.log("[v0] Blockchain campaign ID:", blockchainCampaignId)
 
+          console.log("[v0] Sending POST request to /api/campaigns/deploy with:", {
+            campaignId: campaign.id,
+            blockchainCampaignId,
+            txHash: createHash,
+          })
+
           const response = await fetch("/api/campaigns/deploy", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -210,14 +216,30 @@ export function DeployCampaignButton({ campaign }: DeployCampaignButtonProps) {
             }),
           })
 
-          if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.error || "Failed to update campaign in database")
+          console.log("[v0] API response status:", response.status)
+          console.log("[v0] API response ok:", response.ok)
+
+          const contentType = response.headers.get("content-type")
+          console.log("[v0] Response content-type:", contentType)
+
+          if (!contentType?.includes("application/json")) {
+            const text = await response.text()
+            console.error("[v0] Non-JSON response received:", text.substring(0, 200))
+            throw new Error(`API returned non-JSON response (${response.status}). The API route may not exist.`)
           }
+
+          const result = await response.json()
+          console.log("[v0] API response data:", result)
+
+          if (!response.ok) {
+            throw new Error(result.error || "Failed to update campaign in database")
+          }
+
+          console.log("[v0] Campaign deployed successfully:", result)
 
           toast.success("Campaign deployed successfully!")
 
-          setTimeout(() => window.location.reload(), 1000)
+          window.location.href = `/campaigns/${campaign.id}`
         } catch (error) {
           console.error("[v0] Post-deployment failed:", error)
           toast.error(error instanceof Error ? error.message : "Failed to complete deployment")
