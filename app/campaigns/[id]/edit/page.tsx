@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
+import { Switch } from "@/components/ui/switch"
 import { RichEditor } from "@/components/ui/rich-editor"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Calendar } from "@/components/ui/calendar"
@@ -16,7 +17,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert } from "@/components/ui/alert"
 import { format } from "date-fns"
 import { MediaUpload } from "@/components/ui/media-upload"
-import { Save, ArrowLeft, CalendarIcon, Plus, Trash2 } from "lucide-react"
+import { Save, ArrowLeft, CalendarIcon, Plus, Trash2, DollarSign } from "lucide-react"
 
 interface RewardTier {
   id: string
@@ -87,6 +88,12 @@ export default function EditCampaignPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
+  const [coverImage, setCoverImage] = useState<File | null>(null)
+  const [galleryFiles, setGalleryFiles] = useState<(File | string)[]>([])
+
+  const handleMediaError = useCallback((error: string) => {
+    setErrors((prev) => ({ ...prev, media: error }))
+  }, [])
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -113,6 +120,17 @@ export default function EditCampaignPage() {
           }
         }
 
+        const rewardTiers = (data.tiers || []).map((tier: any) => ({
+          id: tier.id || Date.now().toString(),
+          title: tier.title || "",
+          description: tier.description || "",
+          amount: Number(tier.amount) || 0,
+          deliveryDate: tier.estimated_delivery ? new Date(tier.estimated_delivery) : undefined,
+          quantity: tier.max_backers || null,
+          isLimited: tier.is_limited || false,
+          items: tier.rewards || [],
+        }))
+
         setCampaignData({
           basic: {
             title: data.title || "",
@@ -134,19 +152,12 @@ export default function EditCampaignPage() {
             goal: Number(data.goal_amount) || 0,
             endDate: data.end_date ? new Date(data.end_date) : undefined,
             currency: data.currency || "USD",
-            minPledge: Number(data.min_contribution_usdc) / 1000000 || 1,
+            minPledge: data.min_contribution_usdc ? Number(data.min_contribution_usdc) / 1000000 : 1,
           },
-          rewards: (data.reward_tiers || []).map((tier: any) => ({
-            id: tier.id || Date.now().toString(),
-            title: tier.title || "",
-            description: tier.description || "",
-            amount: Number(tier.amount) || 0,
-            deliveryDate: tier.delivery_date ? new Date(tier.delivery_date) : undefined,
-            quantity: tier.quantity || null,
-            isLimited: tier.is_limited || false,
-            items: tier.items || [],
-          })),
+          rewards: rewardTiers,
         })
+
+        setGalleryFiles(data.gallery || [])
       } catch (error) {
         console.error("Failed to fetch campaign:", error)
         setErrors({ fetch: "Failed to load campaign data" })
@@ -159,6 +170,7 @@ export default function EditCampaignPage() {
   }, [campaignId])
 
   const handleMainImageChange = useCallback((files: File[]) => {
+    setCoverImage(files[0] || null)
     setCampaignData((prev) => {
       if (!prev) return prev
       return {
@@ -173,21 +185,12 @@ export default function EditCampaignPage() {
   }, [])
 
   const handleGalleryChange = useCallback((files: File[]) => {
-    setCampaignData((prev) => {
-      if (!prev) return prev
-      return {
-        ...prev,
-        media: {
-          ...prev.media,
-          gallery: files,
-          galleryUrls: files.map((f) => URL.createObjectURL(f)),
-        },
-      }
+    setGalleryFiles((prev) => {
+      // Keep existing URLs (strings)
+      const existingUrls = prev.filter((item) => typeof item === "string")
+      // Add new files
+      return [...existingUrls, ...files]
     })
-  }, [])
-
-  const handleMediaError = useCallback((error: string) => {
-    setErrors((prev) => ({ ...prev, media: error }))
   }, [])
 
   const addRewardTier = () => {
@@ -235,54 +238,139 @@ export default function EditCampaignPage() {
     if (!campaignData) return
 
     setSaving(true)
+    setErrors({})
+
     try {
-      const formData = new FormData()
+      console.log("[v0] Starting campaign save...")
+
+      let coverImageUrl = campaignData.media.mainImageUrl
+      if (coverImage) {
+        console.log("[v0] Uploading cover image...")
+        const formData = new FormData()
+        formData.append("file", coverImage)
+        formData.append("type", "campaign")
+
+        const uploadResponse = await fetch("/api/upload", {
+          method: "POST",
+          body: formData,
+        })
+
+        if (!uploadResponse.ok) {
+          throw new Error("Failed to upload cover image")
+        }
+
+        const uploadResult = await uploadResponse.json()
+        coverImageUrl = uploadResult.url
+        console.log("[v0] Cover image uploaded:", coverImageUrl)
+      }
+
+      let galleryUrls = [...campaignData.media.galleryUrls]
+      if (galleryFiles.length > 0) {
+        console.log("[v0] Processing gallery files...")
+        const uploadedUrls: string[] = []
+
+        for (const item of galleryFiles) {
+          // If it's a File object, upload it
+          if (item instanceof File) {
+            console.log("[v0] Uploading new gallery image:", item.name)
+            const formData = new FormData()
+            formData.append("file", item)
+            formData.append("type", "campaign")
+
+            const uploadResponse = await fetch("/api/upload", {
+              method: "POST",
+              body: formData,
+            })
+
+            if (!uploadResponse.ok) {
+              throw new Error("Failed to upload gallery image")
+            }
+
+            const uploadResult = await uploadResponse.json()
+            uploadedUrls.push(uploadResult.url)
+          } else if (typeof item === "string") {
+            // If it's a string (existing URL), keep it
+            uploadedUrls.push(item)
+          }
+        }
+
+        // Replace gallery URLs with the processed list
+        galleryUrls = uploadedUrls
+        console.log("[v0] Gallery images processed:", galleryUrls)
+      }
+
+      const minPledgeUsdc =
+        campaignData.funding.minPledge > 0 ? Math.floor(campaignData.funding.minPledge * 1000000) : 1000000
+
+      console.log("[v0] Min pledge calculation:", {
+        minPledge: campaignData.funding.minPledge,
+        minPledgeUsdc,
+      })
 
       const duration = campaignData.funding.endDate
         ? Math.ceil((campaignData.funding.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
         : 30
 
-      formData.append(
-        "data",
-        JSON.stringify({
-          basic: campaignData.basic,
-          media: {
-            youtubeUrl: campaignData.media.youtubeUrl,
-          },
-          funding: {
-            ...campaignData.funding,
-            duration,
-          },
-          rewards: campaignData.rewards.map((reward) => ({
-            ...reward,
-            deliveryDate: reward.deliveryDate ? reward.deliveryDate.toISOString() : "",
-          })),
-        }),
-      )
+      console.log("[v0] Duration calculation:", {
+        endDate: campaignData.funding.endDate,
+        duration,
+      })
 
-      if (campaignData.media.mainImage) {
-        formData.append("coverImage", campaignData.media.mainImage)
+      const updatePayload = {
+        title: campaignData.basic.title,
+        description: campaignData.basic.subtitle,
+        story: campaignData.basic.description,
+        category: campaignData.basic.category,
+        tags: campaignData.basic.tags,
+        goal_amount: campaignData.funding.goal,
+        end_date: campaignData.funding.endDate?.toISOString(),
+        duration,
+        min_contribution_usdc: minPledgeUsdc,
+        video_url: campaignData.media.youtubeUrl || null,
+        cover_image: coverImageUrl,
+        gallery: galleryUrls,
+        tiers: campaignData.rewards.map((reward) => ({
+          id: reward.id,
+          title: reward.title,
+          description: reward.description,
+          amount: reward.amount,
+          isLimited: reward.isLimited,
+          quantity: reward.quantity,
+          items: reward.items,
+          deliveryDate: reward.deliveryDate ? reward.deliveryDate.toISOString() : null,
+        })),
       }
 
-      if (campaignData.media.gallery && campaignData.media.gallery.length > 0) {
-        campaignData.media.gallery.forEach((file) => {
-          formData.append("gallery", file)
-        })
-      }
+      console.log("[v0] Update payload:", JSON.stringify(updatePayload, null, 2))
 
       const response = await fetch(`/api/campaigns/${campaignId}`, {
         method: "PUT",
-        body: formData,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(updatePayload),
       })
 
       if (!response.ok) {
-        const errorData = await response.json()
+        const errorText = await response.text()
+        console.error("[v0] Error response:", errorText)
+
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          throw new Error(`Failed to save campaign: ${errorText}`)
+        }
+
         throw new Error(errorData.error || "Failed to save campaign")
       }
 
+      const result = await response.json()
+      console.log("[v0] Campaign saved successfully:", result)
+
       router.push(`/campaigns/${campaignId}`)
     } catch (error) {
-      console.error("Failed to save campaign:", error)
+      console.error("[v0] Failed to save campaign:", error)
       setErrors({ submit: error instanceof Error ? error.message : "Failed to save campaign" })
     } finally {
       setSaving(false)
@@ -351,10 +439,30 @@ export default function EditCampaignPage() {
           {/* Main Content */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="media">Media</TabsTrigger>
-              <TabsTrigger value="funding">Funding</TabsTrigger>
-              <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
+              <TabsTrigger
+                value="basic"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Basic Info
+              </TabsTrigger>
+              <TabsTrigger
+                value="media"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Media
+              </TabsTrigger>
+              <TabsTrigger
+                value="funding"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Funding
+              </TabsTrigger>
+              <TabsTrigger
+                value="tiers"
+                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Reward Tiers
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="basic" className="space-y-6">
@@ -413,7 +521,7 @@ export default function EditCampaignPage() {
                           }
                         })
                       }
-                      className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
+                      className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
                     />
                   </div>
 
@@ -479,134 +587,6 @@ export default function EditCampaignPage() {
                         }}
                         className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                       />
-                    </div>
-                  </div>
-
-                  <Separator className="my-6" />
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label className="text-base font-semibold">Social Links</Label>
-                      <p className="text-sm text-muted-foreground">
-                        Add your social media links to help backers connect with you
-                      </p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label htmlFor="website">Website</Label>
-                        <Input
-                          id="website"
-                          type="url"
-                          value={campaignData.basic.socialLinks.website}
-                          onChange={(e) =>
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  socialLinks: { ...prev.basic.socialLinks, website: e.target.value },
-                                },
-                              }
-                            })
-                          }
-                          placeholder="https://yourwebsite.com"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="x">X (Twitter)</Label>
-                        <Input
-                          id="x"
-                          type="url"
-                          value={campaignData.basic.socialLinks.x}
-                          onChange={(e) =>
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  socialLinks: { ...prev.basic.socialLinks, x: e.target.value },
-                                },
-                              }
-                            })
-                          }
-                          placeholder="https://x.com/yourhandle"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="instagram">Instagram</Label>
-                        <Input
-                          id="instagram"
-                          type="url"
-                          value={campaignData.basic.socialLinks.instagram}
-                          onChange={(e) =>
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  socialLinks: { ...prev.basic.socialLinks, instagram: e.target.value },
-                                },
-                              }
-                            })
-                          }
-                          placeholder="https://instagram.com/yourhandle"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="youtube">YouTube</Label>
-                        <Input
-                          id="youtube"
-                          type="url"
-                          value={campaignData.basic.socialLinks.youtube}
-                          onChange={(e) =>
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  socialLinks: { ...prev.basic.socialLinks, youtube: e.target.value },
-                                },
-                              }
-                            })
-                          }
-                          placeholder="https://youtube.com/@yourchannel"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="tiktok">TikTok</Label>
-                        <Input
-                          id="tiktok"
-                          type="url"
-                          value={campaignData.basic.socialLinks.tiktok}
-                          onChange={(e) =>
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  socialLinks: { ...prev.basic.socialLinks, tiktok: e.target.value },
-                                },
-                              }
-                            })
-                          }
-                          placeholder="https://tiktok.com/@yourhandle"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -716,23 +696,27 @@ export default function EditCampaignPage() {
                 <CardContent className="space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                      <Label htmlFor="goal">Funding Goal (USD) *</Label>
-                      <Input
-                        id="goal"
-                        type="number"
-                        value={campaignData.funding.goal === 0 ? "" : campaignData.funding.goal}
-                        onChange={(e) => {
-                          const value = e.target.value === "" ? 0 : Number(e.target.value)
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              funding: { ...prev.funding, goal: value },
-                            }
-                          })
-                        }}
-                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                      />
+                      <Label htmlFor="goal">Funding Goal (USDC) *</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="goal"
+                          type="number"
+                          value={campaignData.funding.goal === 0 ? "" : campaignData.funding.goal}
+                          onChange={(e) => {
+                            const value = e.target.value === "" ? 0 : Number(e.target.value)
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                funding: { ...prev.funding, goal: value },
+                              }
+                            })
+                          }}
+                          placeholder="50000"
+                          className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -775,49 +759,27 @@ export default function EditCampaignPage() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="minPledge">Minimum Pledge (USD)</Label>
-                      <Input
-                        id="minPledge"
-                        type="number"
-                        value={campaignData.funding.minPledge === 0 ? "" : campaignData.funding.minPledge}
-                        onChange={(e) => {
-                          const value = e.target.value === "" ? 0 : Number(e.target.value)
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              funding: { ...prev.funding, minPledge: value },
-                            }
-                          })
-                        }}
-                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="currency">Currency</Label>
-                      <Select
-                        value={campaignData.funding.currency}
-                        onValueChange={(value) =>
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              funding: { ...prev.funding, currency: value },
-                            }
-                          })
-                        }
-                      >
-                        <SelectTrigger className="border-2 border-border bg-zinc-800">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD - US Dollar</SelectItem>
-                          <SelectItem value="EUR">EUR - Euro</SelectItem>
-                          <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                          <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label htmlFor="minPledge">Minimum Pledge (USDC)</Label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          id="minPledge"
+                          type="number"
+                          value={campaignData.funding.minPledge === 0 ? "" : campaignData.funding.minPledge}
+                          onChange={(e) => {
+                            const value = e.target.value === "" ? 0 : Number(e.target.value)
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                funding: { ...prev.funding, minPledge: value },
+                              }
+                            })
+                          }}
+                          placeholder="1"
+                          className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
+                      </div>
                     </div>
                   </div>
                 </CardContent>
@@ -829,7 +791,7 @@ export default function EditCampaignPage() {
                 <CardHeader>
                   <div className="flex items-center justify-between">
                     <div>
-                      <CardTitle>Reward Tiers</CardTitle>
+                      <CardTitle className="text-lg">Reward Tiers</CardTitle>
                       <CardDescription>Manage reward tiers for your backers</CardDescription>
                     </div>
                     <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
@@ -860,14 +822,19 @@ export default function EditCampaignPage() {
                               />
                             </div>
                             <div className="space-y-2">
-                              <Label>Amount (USD) *</Label>
-                              <Input
-                                type="number"
-                                value={tier.amount === 0 ? "" : tier.amount}
-                                onChange={(e) => updateRewardTier(index, { ...tier, amount: Number(e.target.value) })}
-                                placeholder="25"
-                                className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                              />
+                              <Label>Amount (USDC) *</Label>
+                              <div className="relative">
+                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
+                                  $
+                                </span>
+                                <Input
+                                  type="number"
+                                  value={tier.amount === 0 ? "" : tier.amount}
+                                  onChange={(e) => updateRewardTier(index, { ...tier, amount: Number(e.target.value) })}
+                                  placeholder="25"
+                                  className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                />
+                              </div>
                             </div>
                           </div>
 
@@ -879,6 +846,58 @@ export default function EditCampaignPage() {
                               placeholder="What backers will receive for this pledge amount"
                               className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
                             />
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Estimated Delivery</Label>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
+                                  >
+                                    <span className="mr-2">📅</span>
+                                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={tier.deliveryDate}
+                                    onSelect={(date) => updateRewardTier(index, { ...tier, deliveryDate: date })}
+                                    disabled={(date) => date < new Date()}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                            <div className="space-y-2">
+                              <Label className="text-base font-semibold">Limited Quantity</Label>
+                              <div className="flex items-center space-x-3 p-4 rounded-lg border-2 border-border bg-zinc-800/50 hover:bg-zinc-800/70 transition-colors">
+                                <Switch
+                                  checked={tier.isLimited}
+                                  onCheckedChange={(checked) =>
+                                    updateRewardTier(index, { ...tier, isLimited: checked })
+                                  }
+                                  className="data-[state=checked]:bg-primary scale-125"
+                                />
+                                <Label className="cursor-pointer flex-1 text-sm font-medium">
+                                  {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
+                                </Label>
+                              </div>
+                              {tier.isLimited && (
+                                <Input
+                                  type="number"
+                                  value={tier.quantity || ""}
+                                  onChange={(e) =>
+                                    updateRewardTier(index, { ...tier, quantity: Number(e.target.value) || null })
+                                  }
+                                  placeholder="100"
+                                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                                />
+                              )}
+                            </div>
                           </div>
                         </CardContent>
                       </Card>

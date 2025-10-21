@@ -158,6 +158,8 @@ export function MediaUpload({
 
     setMediaFiles((prev) => [...prev, ...newMediaFiles])
 
+    const processedFiles: File[] = []
+
     for (let i = 0; i < newMediaFiles.length; i++) {
       const mediaFile = newMediaFiles[i]
 
@@ -177,6 +179,8 @@ export function MediaUpload({
             f.id === mediaFile.id ? { ...f, status: "success" as const, compressed: processedFile } : f,
           ),
         )
+
+        processedFiles.push(processedFile)
       } catch (error) {
         setMediaFiles((prev) => prev.map((f) => (f.id === mediaFile.id ? { ...f, status: "error" as const } : f)))
         onError?.(`Failed to process ${mediaFile.file.name}`)
@@ -184,6 +188,12 @@ export function MediaUpload({
     }
 
     setIsProcessing(false)
+
+    if (processedFiles.length > 0) {
+      setTimeout(() => {
+        onFilesChange(processedFiles)
+      }, 0)
+    }
   }
 
   const onDrop = useCallback(
@@ -228,6 +238,12 @@ export function MediaUpload({
   const removeFile = (id: string) => {
     setMediaFiles((prev) => {
       const updated = prev.filter((f) => f.id !== id)
+      setTimeout(() => {
+        const successfulFiles = updated
+          .filter((f) => f.status === "success" && !f.isExisting && f.file)
+          .map((f) => f.compressed || f.file!)
+        onFilesChange(successfulFiles)
+      }, 0)
       return updated
     })
   }
@@ -236,6 +252,9 @@ export function MediaUpload({
     mediaFiles.forEach((file) => URL.revokeObjectURL(file.preview))
     setMediaFiles([])
     initialFilesLoadedRef.current = false
+    setTimeout(() => {
+      onFilesChange([])
+    }, 0)
   }
 
   const formatFileSize = (bytes: number) => {
@@ -245,17 +264,6 @@ export function MediaUpload({
     const i = Math.floor(Math.log(bytes) / Math.log(k))
     return Number.parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i]
   }
-
-  const notifyFilesChange = useCallback(() => {
-    const successfulFiles = mediaFiles
-      .filter((f) => f.status === "success" && !f.isExisting && f.file)
-      .map((f) => f.compressed || f.file!)
-    onFilesChange(successfulFiles)
-  }, [mediaFiles, onFilesChange])
-
-  useEffect(() => {
-    notifyFilesChange()
-  }, [notifyFilesChange])
 
   return (
     <div className={`space-y-4 ${className}`}>

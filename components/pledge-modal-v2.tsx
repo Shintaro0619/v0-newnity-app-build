@@ -38,6 +38,8 @@ interface Tier {
   starts_at?: string | null // Add time constraints
   ends_at?: string | null
   sort_order?: number // Add sort order
+  max_backers?: number | null // Add max_backers
+  minted?: number | null // Add minted count
 }
 
 export function PledgeModalV2({
@@ -248,6 +250,12 @@ export function PledgeModalV2({
                   {sortedTiers.map((tier) => {
                     const available = isTierAvailable(tier, nowUtcSec)
                     const statusMessage = getTierStatusMessage(tier, nowUtcSec)
+                    const isSoldOut =
+                      tier.is_limited &&
+                      tier.max_backers !== null &&
+                      tier.max_backers !== undefined &&
+                      (tier.minted || 0) >= tier.max_backers
+                    const isAvailable = available && !isSoldOut
 
                     return (
                       <Card
@@ -255,12 +263,12 @@ export function PledgeModalV2({
                         className={`cursor-pointer transition-all ${
                           selectedTierId === tier.id
                             ? "border-primary ring-2 ring-primary/20"
-                            : available
+                            : isAvailable
                               ? "hover:border-muted-foreground/20"
                               : "opacity-60 cursor-not-allowed"
                         }`}
                         onClick={() => {
-                          if (available) {
+                          if (isAvailable) {
                             setSelectedTierId(tier.id)
                             setCustomAmount(false)
                           }
@@ -270,9 +278,14 @@ export function PledgeModalV2({
                           <div className="flex items-start justify-between gap-4">
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <RadioGroupItem value={tier.id} id={tier.id} disabled={!available} />
+                                <RadioGroupItem value={tier.id} id={tier.id} disabled={!isAvailable} />
                                 <CardTitle className="text-base">{tier.title}</CardTitle>
-                                {statusMessage && (
+                                {isSoldOut && (
+                                  <Badge variant="destructive" className="text-xs">
+                                    Sold Out
+                                  </Badge>
+                                )}
+                                {statusMessage && !isSoldOut && (
                                   <Badge variant={available ? "secondary" : "destructive"} className="text-xs">
                                     {statusMessage}
                                   </Badge>
@@ -282,6 +295,13 @@ export function PledgeModalV2({
                                 className="mt-1"
                                 dangerouslySetInnerHTML={{ __html: tier.description }}
                               />
+                              {tier.is_limited && tier.max_backers !== null && tier.max_backers !== undefined && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {isSoldOut
+                                    ? `All ${tier.max_backers} claimed`
+                                    : `${tier.max_backers - (tier.minted || 0)} of ${tier.max_backers} remaining`}
+                                </p>
+                              )}
                             </div>
                             <div className="text-right flex-shrink-0">
                               <div className="text-lg font-bold text-primary">${formatUSDC(tier.amount)}</div>
@@ -422,7 +442,7 @@ export function PledgeModalV2({
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Step 1: Approve USDC</CardTitle>
-                <CardDescription>Allow the escrow contract to spend {amount} USDC</CardDescription>
+                <CardDescription>Allow the escrow contract to spend {Math.floor(Number(amount))} USDC</CardDescription>
               </CardHeader>
             </Card>
 

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback } from "react"
 import { useAccount } from "wagmi"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -146,7 +146,7 @@ export default function CreateCampaignPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
-  const rewardTiersEndRef = useRef<HTMLDivElement>(null)
+  // const rewardTiersEndRef = useRef<HTMLDivElement>(null)
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
@@ -204,7 +204,7 @@ export default function CreateCampaignPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label>Amount (USD) *</Label>
+              <Label>Amount (USDC) *</Label>
               <div className="relative">
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
                 <Input
@@ -391,9 +391,6 @@ export default function CreateCampaignPage() {
       ...prev,
       rewards: [...prev.rewards, newTier],
     }))
-    setTimeout(() => {
-      rewardTiersEndRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" })
-    }, 100)
   }
 
   const updateRewardTier = (index: number, updatedTier: RewardTier) => {
@@ -567,6 +564,19 @@ export default function CreateCampaignPage() {
         body: formData,
       })
 
+      const contentType = response.headers.get("content-type")
+      if (!contentType || !contentType.includes("application/json")) {
+        console.error("[v0] Server returned non-JSON response. Status:", response.status)
+
+        if (response.status === 502 || response.status === 503 || response.status === 504) {
+          throw new Error(
+            "Vercel is experiencing infrastructure issues. Please try again in a few minutes. Check https://vercel-status.com for updates.",
+          )
+        }
+
+        throw new Error("Server returned an unexpected response. Please try again.")
+      }
+
       if (!response.ok) {
         const errorData = await response.json()
         throw new Error(errorData.error || "Failed to save campaign")
@@ -575,7 +585,7 @@ export default function CreateCampaignPage() {
       const result = await response.json()
       console.log("[v0] Campaign created successfully:", result)
 
-      router.push(`/dashboard?newCampaign=${result.campaign.id}`)
+      router.push(`/dashboard?newCampaign=${result.campaignId}`)
     } catch (error) {
       console.error("[v0] Campaign creation failed:", error)
       setErrors({ submit: error instanceof Error ? error.message : "Failed to create campaign" })
@@ -606,12 +616,13 @@ export default function CreateCampaignPage() {
   }, [])
 
   const handleGalleryChange = useCallback((files: File[]) => {
+    console.log("[v0] Gallery files changed:", files.length)
     setCampaignData((prev) => ({
       ...prev,
       media: {
         ...prev.media,
-        gallery: files,
-        galleryUrls: files.map((f) => URL.createObjectURL(f)), // Store URLs
+        gallery: [...prev.media.gallery, ...files], // Append new files to existing gallery
+        galleryUrls: [...prev.media.galleryUrls, ...files.map((f) => URL.createObjectURL(f))],
       },
     }))
   }, [])
@@ -689,6 +700,23 @@ export default function CreateCampaignPage() {
                   <p className="text-sm font-mono">
                     {address.slice(0, 6)}...{address.slice(-4)}
                   </p>
+                </div>
+              </div>
+            </Alert>
+          )}
+
+          {errors.submit && (
+            <Alert className="border-2 border-destructive bg-destructive/10">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl flex-shrink-0">❌</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-destructive">{errors.submit}</p>
+                  {errors.submit.includes("Vercel") && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      This appears to be a temporary Vercel infrastructure issue. Your campaign data is safe. Please
+                      wait a few minutes and try again.
+                    </p>
+                  )}
                 </div>
               </div>
             </Alert>
@@ -849,119 +877,6 @@ export default function CreateCampaignPage() {
                           </p>
                         </div>
                       </div>
-
-                      <Separator className="my-6" />
-
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label className="text-base font-semibold">Social Links</Label>
-                          <p className="text-sm text-muted-foreground">
-                            Add your social media links to help backers connect with you
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-2">
-                            <Label htmlFor="website">Website</Label>
-                            <Input
-                              id="website"
-                              type="url"
-                              value={campaignData.basic.socialLinks.website}
-                              onChange={(e) =>
-                                setCampaignData((prev) => ({
-                                  ...prev,
-                                  basic: {
-                                    ...prev.basic,
-                                    socialLinks: { ...prev.basic.socialLinks, website: e.target.value },
-                                  },
-                                }))
-                              }
-                              placeholder="https://yourwebsite.com"
-                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="x">X (Twitter)</Label>
-                            <Input
-                              id="x"
-                              type="url"
-                              value={campaignData.basic.socialLinks.x}
-                              onChange={(e) =>
-                                setCampaignData((prev) => ({
-                                  ...prev,
-                                  basic: {
-                                    ...prev.basic,
-                                    socialLinks: { ...prev.basic.socialLinks, x: e.target.value },
-                                  },
-                                }))
-                              }
-                              placeholder="https://x.com/yourhandle"
-                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="instagram">Instagram</Label>
-                            <Input
-                              id="instagram"
-                              type="url"
-                              value={campaignData.basic.socialLinks.instagram}
-                              onChange={(e) =>
-                                setCampaignData((prev) => ({
-                                  ...prev,
-                                  basic: {
-                                    ...prev.basic,
-                                    socialLinks: { ...prev.basic.socialLinks, instagram: e.target.value },
-                                  },
-                                }))
-                              }
-                              placeholder="https://instagram.com/yourhandle"
-                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="youtube">YouTube</Label>
-                            <Input
-                              id="youtube"
-                              type="url"
-                              value={campaignData.basic.socialLinks.youtube}
-                              onChange={(e) =>
-                                setCampaignData((prev) => ({
-                                  ...prev,
-                                  basic: {
-                                    ...prev.basic,
-                                    socialLinks: { ...prev.basic.socialLinks, youtube: e.target.value },
-                                  },
-                                }))
-                              }
-                              placeholder="https://youtube.com/@yourchannel"
-                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="tiktok">TikTok</Label>
-                            <Input
-                              id="tiktok"
-                              type="url"
-                              value={campaignData.basic.socialLinks.tiktok}
-                              onChange={(e) =>
-                                setCampaignData((prev) => ({
-                                  ...prev,
-                                  basic: {
-                                    ...prev.basic,
-                                    socialLinks: { ...prev.basic.socialLinks, tiktok: e.target.value },
-                                  },
-                                }))
-                              }
-                              placeholder="https://tiktok.com/@yourhandle"
-                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
-                          </div>
-                        </div>
-                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>
@@ -1091,7 +1006,7 @@ export default function CreateCampaignPage() {
                     <CardContent className="space-y-6">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div className="space-y-2">
-                          <Label htmlFor="goal">Funding Goal (USD) *</Label>
+                          <Label htmlFor="goal">Funding Goal (USDC) *</Label>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1157,7 +1072,7 @@ export default function CreateCampaignPage() {
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="minPledge">Minimum Pledge (USD)</Label>
+                          <Label htmlFor="minPledge">Minimum Pledge (USDC)</Label>
                           <div className="relative">
                             <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
@@ -1178,28 +1093,7 @@ export default function CreateCampaignPage() {
                           <p className="text-xs text-muted-foreground">Minimum amount backers can pledge</p>
                         </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="currency">Currency</Label>
-                          <Select
-                            value={campaignData.funding.currency}
-                            onValueChange={(value) =>
-                              setCampaignData((prev) => ({
-                                ...prev,
-                                funding: { ...prev.funding, currency: value },
-                              }))
-                            }
-                          >
-                            <SelectTrigger className="border-2 border-border bg-zinc-800">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="USD">USD - US Dollar</SelectItem>
-                              <SelectItem value="EUR">EUR - Euro</SelectItem>
-                              <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                              <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        {/* Currency selection removed - USDC only */}
                       </div>
 
                       <Alert>
@@ -1251,7 +1145,6 @@ export default function CreateCampaignPage() {
                             onDelete={() => deleteRewardTier(index)}
                           />
                         ))}
-                        <div ref={rewardTiersEndRef} />
 
                         {campaignData.rewards.length === 0 && (
                           <Card className="border-dashed border-2">
@@ -1282,7 +1175,6 @@ export default function CreateCampaignPage() {
                 <Button
                   onClick={handleSubmit}
                   disabled={loading || !isConnected}
-                  size="lg"
                   className={!isConnected ? "opacity-50 cursor-not-allowed" : ""}
                 >
                   {loading ? "Creating Campaign..." : !isConnected ? "Connect Wallet to Create" : "Create Campaign"}

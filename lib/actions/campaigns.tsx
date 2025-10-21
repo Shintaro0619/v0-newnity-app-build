@@ -652,6 +652,50 @@ export async function savePledgeToDatabase(data: {
 
     const backerId = await ensureUserExists(data.backerWalletAddress)
 
+    if (data.tierId) {
+      const tier = await sql`
+        SELECT is_limited, max_backers, minted, is_active, starts_at, ends_at
+        FROM tiers
+        WHERE id = ${data.tierId}
+      `
+
+      if (tier.length === 0) {
+        console.error("[v0] Tier not found:", data.tierId)
+        return { success: false, error: "Tier not found" }
+      }
+
+      const tierData = tier[0]
+
+      // Check if tier is active
+      if (tierData.is_active === false) {
+        console.error("[v0] Tier is not active:", data.tierId)
+        return { success: false, error: "This reward tier is not active" }
+      }
+
+      // Check time constraints
+      const now = new Date()
+      if (tierData.starts_at && now < new Date(tierData.starts_at)) {
+        console.error("[v0] Tier not available yet:", data.tierId)
+        return { success: false, error: "This reward tier is not available yet" }
+      }
+      if (tierData.ends_at && now > new Date(tierData.ends_at)) {
+        console.error("[v0] Tier has expired:", data.tierId)
+        return { success: false, error: "This reward tier has expired" }
+      }
+
+      // Check if tier has reached max backers
+      if (tierData.is_limited && tierData.max_backers !== null) {
+        const currentMinted = tierData.minted || 0
+        if (currentMinted >= tierData.max_backers) {
+          console.error("[v0] Tier sold out:", data.tierId)
+          return {
+            success: false,
+            error: `This reward tier is sold out (${tierData.max_backers} backers limit reached)`,
+          }
+        }
+      }
+    }
+
     // Create pledge record
     await sql`
       INSERT INTO pledges (
@@ -689,6 +733,17 @@ export async function savePledgeToDatabase(data: {
         updated_at = NOW()
       WHERE id = ${data.campaignId}
     `
+
+    if (data.tierId) {
+      await sql`
+        UPDATE tiers
+        SET 
+          minted = COALESCE(minted, 0) + 1,
+          updated_at = NOW()
+        WHERE id = ${data.tierId}
+      `
+      console.log("[v0] Tier minted count incremented for tier:", data.tierId)
+    }
 
     console.log("[v0] Pledge saved to database successfully")
     return { success: true }
