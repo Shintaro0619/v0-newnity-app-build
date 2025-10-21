@@ -377,6 +377,120 @@ export default function EditCampaignPage() {
     }
   }
 
+  const RewardTierCard = ({
+    tier,
+    index,
+    onUpdate,
+    onDelete,
+  }: {
+    tier: RewardTier
+    index: number
+    onUpdate: (tier: RewardTier) => void
+    onDelete: () => void
+  }) => {
+    const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
+
+    return (
+      <Card className="border-2 border-border">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-lg">Reward Tier</CardTitle>
+          <Button variant="ghost" size="sm" onClick={onDelete}>
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Title *</Label>
+              <Input
+                value={tier.title}
+                onChange={(e) => onUpdate({ ...tier, title: e.target.value })}
+                placeholder="Early Bird Special"
+                className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Amount (USDC) *</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
+                <Input
+                  type="number"
+                  value={tier.amount === 0 ? "" : tier.amount}
+                  onChange={(e) => onUpdate({ ...tier, amount: Number(e.target.value) })}
+                  placeholder="25"
+                  className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Description *</Label>
+            <RichEditor
+              content={tier.description}
+              onChange={(content) => onUpdate({ ...tier, description: content })}
+              placeholder="What backers will receive for this pledge amount"
+              className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Estimated Delivery</Label>
+              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
+                  >
+                    <span className="mr-2">📅</span>
+                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={tier.deliveryDate}
+                    onSelect={(date) => {
+                      onUpdate({ ...tier, deliveryDate: date })
+                      if (date) {
+                        setIsDeliveryDateOpen(false)
+                      }
+                    }}
+                    disabled={(date) => date < new Date()}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-base font-semibold">Limited Quantity</Label>
+              <div className="flex items-center space-x-3 p-4 rounded-lg border-2 border-border bg-zinc-800/50 hover:bg-zinc-800/70 transition-colors">
+                <Switch
+                  checked={tier.isLimited}
+                  onCheckedChange={(checked) => onUpdate({ ...tier, isLimited: checked })}
+                  className="data-[state=checked]:bg-primary scale-125"
+                />
+                <Label className="cursor-pointer flex-1 text-sm font-medium">
+                  {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
+                </Label>
+              </div>
+              {tier.isLimited && (
+                <Input
+                  type="number"
+                  value={tier.quantity || ""}
+                  onChange={(e) => onUpdate({ ...tier, quantity: Number(e.target.value) || null })}
+                  placeholder="100"
+                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                />
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -803,104 +917,13 @@ export default function EditCampaignPage() {
                 <CardContent className="space-y-6">
                   <div className="space-y-6">
                     {campaignData.rewards.map((tier, index) => (
-                      <Card key={tier.id} className="border-2 border-border">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                          <CardTitle className="text-lg">Reward Tier</CardTitle>
-                          <Button variant="ghost" size="sm" onClick={() => deleteRewardTier(index)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Title *</Label>
-                              <Input
-                                value={tier.title}
-                                onChange={(e) => updateRewardTier(index, { ...tier, title: e.target.value })}
-                                placeholder="Early Bird Special"
-                                className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                              />
-                            </div>
-                            <div className="space-y-2">
-                              <Label>Amount (USDC) *</Label>
-                              <div className="relative">
-                                <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">
-                                  $
-                                </span>
-                                <Input
-                                  type="number"
-                                  value={tier.amount === 0 ? "" : tier.amount}
-                                  onChange={(e) => updateRewardTier(index, { ...tier, amount: Number(e.target.value) })}
-                                  placeholder="25"
-                                  className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                                />
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label>Description *</Label>
-                            <RichEditor
-                              content={tier.description}
-                              onChange={(content) => updateRewardTier(index, { ...tier, description: content })}
-                              placeholder="What backers will receive for this pledge amount"
-                              className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
-                            />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label>Estimated Delivery</Label>
-                              <Popover>
-                                <PopoverTrigger asChild>
-                                  <Button
-                                    variant="outline"
-                                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
-                                  >
-                                    <span className="mr-2">📅</span>
-                                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-0" align="start">
-                                  <Calendar
-                                    mode="single"
-                                    selected={tier.deliveryDate}
-                                    onSelect={(date) => updateRewardTier(index, { ...tier, deliveryDate: date })}
-                                    disabled={(date) => date < new Date()}
-                                    initialFocus
-                                  />
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-base font-semibold">Limited Quantity</Label>
-                              <div className="flex items-center space-x-3 p-4 rounded-lg border-2 border-border bg-zinc-800/50 hover:bg-zinc-800/70 transition-colors">
-                                <Switch
-                                  checked={tier.isLimited}
-                                  onCheckedChange={(checked) =>
-                                    updateRewardTier(index, { ...tier, isLimited: checked })
-                                  }
-                                  className="data-[state=checked]:bg-primary scale-125"
-                                />
-                                <Label className="cursor-pointer flex-1 text-sm font-medium">
-                                  {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
-                                </Label>
-                              </div>
-                              {tier.isLimited && (
-                                <Input
-                                  type="number"
-                                  value={tier.quantity || ""}
-                                  onChange={(e) =>
-                                    updateRewardTier(index, { ...tier, quantity: Number(e.target.value) || null })
-                                  }
-                                  placeholder="100"
-                                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                                />
-                              )}
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <RewardTierCard
+                        key={tier.id}
+                        tier={tier}
+                        index={index}
+                        onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
+                        onDelete={() => deleteRewardTier(index)}
+                      />
                     ))}
 
                     {campaignData.rewards.length === 0 && (
