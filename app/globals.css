@@ -403,3 +403,33 @@
   min-width: auto;
   width: 100%;
 }
+
+/* Enhanced ActionRequired card styles with comprehensive safeguards */
+/* ActionRequired カード内だけを水平テキストに固定 */
+[data-action-required] {
+  writing-mode: horizontal-tb !important; /* 縦書きが残っていても解除 */
+}
+
+/* 本文は確実に通常フローで表示 */
+[data-action-required] p,
+[data-action-required] .alert-description,
+[data-action-required] [data-slot="description"] {
+  display: block !important;
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* 親が flex/grid でもテキスト列が潰れないように */
+[data-action-required] .text-col {
+  min-width: 0 !important;
+  flex: 1 1 auto !important;
+  width: 100%;
+}
+
+/* 万一 grid にされても横並びレイアウトを優先 */
+[data-action-required] .content {
+  display: flex !important;
+  gap: 0.75rem !important;
+  align-items: flex-start !important;
+}

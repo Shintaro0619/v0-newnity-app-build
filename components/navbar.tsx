@@ -42,6 +42,11 @@ export function Navbar() {
     }
   }
 
+  const handleDiscoverClick = () => {
+    setSearchQuery("")
+    window.location.href = "/discover"
+  }
+
   return (
     <nav
       className={`fixed top-0 z-50 w-full border-b border-primary/20 bg-black/80 backdrop-blur-nav supports-[backdrop-filter]:bg-black/60 ${
@@ -59,11 +64,14 @@ export function Navbar() {
 
         <div className="hidden lg:flex items-center space-x-4 flex-1 max-w-2xl mx-8">
           <div className="hidden md:flex items-center space-x-1">
-            <Link href="/discover">
-              <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
-                Discover
-              </Button>
-            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-300 hover:text-white hover:bg-gray-900"
+              onClick={handleDiscoverClick}
+            >
+              Discover
+            </Button>
 
             <Link href="/dashboard">
               <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
@@ -93,11 +101,14 @@ export function Navbar() {
         </div>
 
         <div className="flex lg:hidden items-center space-x-1">
-          <Link href="/discover">
-            <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">
-              Discover
-            </Button>
-          </Link>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-gray-300 hover:text-white hover:bg-gray-900"
+            onClick={handleDiscoverClick}
+          >
+            Discover
+          </Button>
 
           <Link href="/dashboard">
             <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-gray-900">

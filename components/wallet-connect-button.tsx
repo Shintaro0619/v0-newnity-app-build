@@ -103,7 +103,7 @@ export function WalletConnectButton() {
           {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-40">
+      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[60] mt-4">
         {connectors.length === 0 ? (
           <DropdownMenuItem disabled className="text-gray-500">
             No wallets available

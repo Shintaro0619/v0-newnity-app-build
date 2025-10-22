@@ -20,6 +20,7 @@ import {
 import { formatDeadline, isDeadlinePassed } from "@/lib/utils/date-utils"
 import { toast } from "react-toastify"
 import { formatCurrency } from "@/lib/utils"
+import { usePublicClient } from "wagmi"
 
 interface CampaignDetailClientProps {
   campaign: any
@@ -37,6 +38,9 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     backers: number
   } | null>(null)
 
+  const [finalizeAttempting, setFinalizeAttempting] = useState(false)
+  const [finalizeTransactionHash, setFinalizeTransactionHash] = useState<string | null>(null)
+
   const { address } = useAccount()
   const router = useRouter()
 
@@ -49,12 +53,14 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     handleFinalize,
     handleRefund,
     isFinalizePending,
-    isFinalizeSuccess,
     isRefundPending,
     hasClaimedRefund,
     userPledgeAmount,
-    isRefundSuccess, // Added isRefundSuccess from contractHook
+    isRefundSuccess,
+    refetchPledgeStatus, // Import refetchPledgeStatus from hook
   } = contractHook
+
+  const publicClient = usePublicClient()
 
   const refreshCampaignData = async () => {
     try {
@@ -173,19 +179,92 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
   }, [campaign.id])
 
   useEffect(() => {
-    if (isFinalizeSuccess) {
-      console.log("[v0] [CLIENT] Finalize transaction successful, refreshing data")
-      syncAttempted.current = false
-      refreshCampaignData()
+    if (!isRefundSuccess || !contractHook.finalizeHash) return
 
-      // Delayed refresh to ensure blockchain state is updated
-      setTimeout(async () => {
-        console.log("[v0] [CLIENT] Performing delayed refresh after finalize")
+    const performFinalizeFlow = async () => {
+      console.log("[v0] [CLIENT] Finalize transaction confirmed, starting receipt wait + forced sync flow")
+      setFinalizeTransactionHash(contractHook.finalizeHash!)
+
+      try {
+        console.log("[v0] [CLIENT] Waiting for transaction receipt...")
+        if (!publicClient) {
+          throw new Error("Public client not available")
+        }
+
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: contractHook.finalizeHash as `0x${string}`,
+          confirmations: 2,
+        })
+
+        console.log("[v0] [CLIENT] Transaction receipt received:", {
+          status: receipt.status,
+          blockNumber: receipt.blockNumber,
+        })
+
+        if (receipt.status !== "success") {
+          throw new Error("Finalize transaction failed on blockchain")
+        }
+
+        console.log("[v0] [CLIENT] Receipt confirmed, forcing immediate sync")
         syncAttempted.current = false
-        await refreshCampaignData()
-      }, 3000)
+
+        const immediateSync = await fetch(`/api/campaigns/${campaign.id}/sync`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ force: true }),
+          cache: "no-store",
+        }).then((r) => r.json())
+
+        console.log("[v0] [CLIENT] Immediate sync result:", immediateSync)
+
+        for (let attempt = 1; attempt <= 8; attempt++) {
+          console.log(`[v0] [CLIENT] Polling attempt ${attempt}/8`)
+
+          const pollResult = await fetch(`/api/campaigns/${campaign.id}/sync`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ force: true }),
+            cache: "no-store",
+          }).then((r) => r.json())
+
+          console.log(`[v0] [CLIENT] Poll result (attempt ${attempt}):`, pollResult)
+
+          if (pollResult.ok && pollResult.chain?.finalized) {
+            console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
+
+            syncAttempted.current = false
+            await refreshCampaignData()
+
+            toast.success(
+              `Campaign finalized successfully! ${pollResult.chain.successful ? "Funds have been released to your wallet." : "Refunds are now available for backers."}`,
+              { duration: 5000 },
+            )
+
+            setFinalizeAttempting(false)
+            return
+          }
+
+          if (attempt < 8) {
+            console.log("[v0] [CLIENT] Not finalized yet, waiting 2.5s before next poll...")
+            await new Promise((resolve) => setTimeout(resolve, 2500))
+          }
+        }
+
+        console.log("[v0] [CLIENT] Max polling attempts reached, blockchain may need more time")
+        toast.warning(
+          "Finalize transaction was sent and confirmed, but blockchain state update is taking longer than expected. Please check BaseScan or use the 'Refresh Status' button.",
+          { duration: 10000 },
+        )
+        setFinalizeAttempting(false)
+      } catch (error) {
+        console.error("[v0] [CLIENT] Finalize flow error:", error)
+        toast.error(`Finalize failed: ${error instanceof Error ? error.message : "Unknown error"}`)
+        setFinalizeAttempting(false)
+      }
     }
-  }, [isFinalizeSuccess])
+
+    performFinalizeFlow()
+  }, [isRefundSuccess, contractHook.finalizeHash, campaign.id, publicClient])
 
   useEffect(() => {
     if (isRefundSuccess) {
@@ -193,14 +272,18 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       syncAttempted.current = false
       refreshCampaignData()
 
-      // Delayed refresh to ensure blockchain state is updated
       setTimeout(async () => {
         console.log("[v0] [CLIENT] Performing delayed refresh after refund")
         syncAttempted.current = false
         await refreshCampaignData()
+
+        if (refetchPledgeStatus) {
+          console.log("[v0] [CLIENT] Refetching pledge status after refund")
+          await refetchPledgeStatus()
+        }
       }, 3000)
     }
-  }, [isRefundSuccess])
+  }, [isRefundSuccess, refetchPledgeStatus])
 
   const handleFinalizeClick = async () => {
     console.log("[v0] [CLIENT] handleFinalizeClick called")
@@ -208,6 +291,11 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     if (!blockchainId) {
       console.error("[v0] [CLIENT] No blockchain campaign ID - cannot finalize")
       toast.error("Cannot finalize: Campaign not deployed to blockchain")
+      return
+    }
+
+    if (finalizeAttempting) {
+      console.log("[v0] [CLIENT] Finalize already in progress")
       return
     }
 
@@ -223,12 +311,135 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     try {
+      setFinalizeAttempting(true)
       console.log("[v0] [CLIENT] Calling handleFinalize with campaignId:", blockchainId)
+
       handleFinalize(blockchainId)
-      console.log("[v0] [CLIENT] handleFinalize called, waiting for transaction confirmation")
+
+      console.log("[v0] [CLIENT] Waiting for transaction hash...")
+      let txHash: string | null = null
+      for (let i = 0; i < 60; i++) {
+        await new Promise((resolve) => setTimeout(resolve, 500))
+        if (contractHook.finalizeHash) {
+          txHash = contractHook.finalizeHash
+          break
+        }
+      }
+
+      if (!txHash) {
+        throw new Error("Transaction hash not available after 30 seconds")
+      }
+
+      console.log("[v0] [CLIENT] Finalize transaction hash:", txHash)
+      console.log("[v0] [CLIENT] View on BaseScan: https://sepolia.basescan.org/tx/" + txHash)
+      setFinalizeTransactionHash(txHash)
+
+      console.log("[v0] [CLIENT] Waiting for transaction receipt...")
+      if (!publicClient) {
+        throw new Error("Public client not available")
+      }
+
+      const receipt = await publicClient.waitForTransactionReceipt({
+        hash: txHash as `0x${string}`,
+        confirmations: 1,
+      })
+
+      console.log("[v0] [CLIENT] Transaction receipt received:", {
+        status: receipt.status,
+        blockNumber: receipt.blockNumber,
+      })
+
+      if (receipt.status !== "success") {
+        throw new Error("Finalize transaction failed on blockchain")
+      }
+
+      console.log("[v0] [CLIENT] Receipt confirmed, calling after-finalize API")
+
+      const syncResponse = await fetch(`/api/campaigns/${blockchainId}/after-finalize`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ txHash, chainId: blockchainId }),
+        cache: "no-store",
+      })
+
+      const syncResult = await syncResponse.json()
+      console.log("[v0] [CLIENT] after-finalize API result:", syncResult)
+
+      if (!syncResult.ok) {
+        throw new Error(syncResult.error || "Failed to sync blockchain state")
+      }
+
+      for (let attempt = 1; attempt <= 7; attempt++) {
+        console.log(`[v0] [CLIENT] Polling attempt ${attempt}/7`)
+
+        if (syncResult.chain?.finalized) {
+          console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
+          break
+        }
+
+        if (attempt < 7) {
+          console.log("[v0] [CLIENT] Not finalized yet, waiting 2s before next poll...")
+          await new Promise((resolve) => setTimeout(resolve, 2000))
+
+          const pollResponse = await fetch(`/api/campaigns/${blockchainId}/after-finalize`, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify({ chainId: blockchainId }),
+            cache: "no-store",
+          })
+
+          const pollResult = await pollResponse.json()
+          console.log(`[v0] [CLIENT] Poll result (attempt ${attempt}):`, pollResult)
+
+          if (pollResult.ok && pollResult.chain?.finalized) {
+            console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
+            Object.assign(syncResult, pollResult)
+            break
+          }
+        }
+      }
+
+      syncAttempted.current = false
+      await refreshCampaignData()
+      router.refresh()
+
+      toast.success(
+        `Campaign finalized successfully! ${syncResult.chain?.successful ? "Funds have been released to your wallet." : "Refunds are now available for backers."}`,
+        { duration: 5000 },
+      )
+
+      setFinalizeAttempting(false)
+      setFinalizeTransactionHash(null)
     } catch (error) {
       console.error("[v0] [CLIENT] Failed to finalize campaign:", error)
       toast.error(`Failed to finalize campaign: ${error instanceof Error ? error.message : "Unknown error"}`)
+      setFinalizeAttempting(false)
+      setFinalizeTransactionHash(null)
+    }
+  }
+
+  const handleManualRefresh = async () => {
+    console.log("[v0] [CLIENT] Manual refresh triggered")
+    try {
+      const syncResponse = await fetch(`/api/campaigns/${campaign.id}/sync`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      })
+
+      const syncResult = await syncResponse.json()
+      console.log("[v0] [CLIENT] Manual sync result:", syncResult)
+
+      if (syncResult.ok) {
+        syncAttempted.current = false
+        await refreshCampaignData()
+        toast.success("Campaign status refreshed successfully!")
+      } else {
+        toast.error("Failed to refresh campaign status")
+      }
+    } catch (error) {
+      console.error("[v0] [CLIENT] Manual refresh error:", error)
+      toast.error("Failed to refresh campaign status")
     }
   }
 
@@ -513,7 +724,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                         className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.979 6.98 1.281-.059 1.689-.073 4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                         </svg>
                         <span className="text-sm font-medium">Instagram</span>
                       </a>
@@ -526,7 +737,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                         className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
+                          <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
                         </svg>
                         <span className="text-sm font-medium">YouTube</span>
                       </a>
@@ -665,6 +876,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                 {campaign.status === "ACTIVE" && blockchainId && (
                   <>
                     {hasDeadlinePassed && !isBlockchainFinalized ? (
+                      // Enhanced action buttons with manual refresh
                       <div className="space-y-2">
                         <div className="p-3 bg-purple-50 dark:bg-purple-950 border border-purple-200 dark:border-purple-800 rounded-lg text-sm">
                           <p className="font-medium text-purple-900 dark:text-purple-100 mb-1">⏰ Campaign Ended</p>
@@ -680,13 +892,39 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                           Back This Project
                         </Button>
                         {isCreator && (
-                          <Button
-                            className="w-full bg-blue-600 hover:bg-blue-700"
-                            onClick={handleFinalizeClick}
-                            disabled={isFinalizePending}
-                          >
-                            {isFinalizePending ? "Finalizing..." : "Finalize Campaign"}
-                          </Button>
+                          <>
+                            <Button
+                              className="w-full bg-blue-600 hover:bg-blue-700"
+                              onClick={handleFinalizeClick}
+                              disabled={isFinalizePending || finalizeAttempting}
+                            >
+                              {finalizeAttempting
+                                ? "Finalizing & Syncing..."
+                                : isFinalizePending
+                                  ? "Sending Transaction..."
+                                  : "Finalize Campaign"}
+                            </Button>
+                            {finalizeTransactionHash && (
+                              <div className="space-y-2">
+                                <a
+                                  href={`https://sepolia.basescan.org/tx/${finalizeTransactionHash}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="block text-xs text-center text-blue-600 hover:text-blue-700 underline"
+                                >
+                                  View on BaseScan ↗
+                                </a>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="w-full bg-transparent"
+                                  onClick={handleManualRefresh}
+                                >
+                                  🔄 Refresh Status
+                                </Button>
+                              </div>
+                            )}
+                          </>
                         )}
                       </div>
                     ) : (

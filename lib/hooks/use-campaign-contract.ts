@@ -230,14 +230,33 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  const { writeContract: finalizeCampaign, data: finalizeHash, isPending: isFinalizePending } = useWriteContract()
+  const {
+    writeContract: finalizeCampaign,
+    data: finalizeHash,
+    isPending: isFinalizePending,
+    error: finalizeError,
+  } = useWriteContract()
+
+  useEffect(() => {
+    if (finalizeHash) {
+      console.log("[v0] [CLIENT] Finalize transaction hash:", finalizeHash)
+      console.log("[v0] [CLIENT] View on BaseScan:", `https://sepolia.basescan.org/tx/${finalizeHash}`)
+    }
+
+    if (finalizeError) {
+      console.error("[v0] [CLIENT] Finalize error:", finalizeError)
+      toast.error(`Finalize failed: ${finalizeError.message}`)
+    }
+  }, [finalizeHash, finalizeError])
 
   const { isLoading: isFinalizeLoading, isSuccess: isFinalizeSuccess } = useWaitForTransactionReceipt({
     hash: finalizeHash,
     onSuccess: async (receipt) => {
       console.log("[v0] Campaign finalized on blockchain:", { hash: finalizeHash, blockNumber: receipt.blockNumber })
       toast.success("Campaign finalized!")
-      refetchCampaign()
+
+      console.log("[v0] Refetching campaign data from blockchain...")
+      await refetchCampaign()
 
       // Extract finalization data from logs
       try {
@@ -290,6 +309,8 @@ export function useCampaignContract(campaignId?: number) {
           console.log("[v0] Campaign finalized in database")
 
           if (decoded.args.successful) {
+            console.log("[v0] Campaign was successful, checking for FundsReleased event")
+
             const fundsReleasedLog = receipt.logs.find((log) => {
               try {
                 const decoded = decodeEventLog({
@@ -315,8 +336,15 @@ export function useCampaignContract(campaignId?: number) {
               const creatorAmount = Number(fundsDecoded.args.amount) / 1e6
               const platformFee = Number(fundsDecoded.args.platformFee) / 1e6
 
+              console.log("[v0] Funds released details:", {
+                creator: fundsDecoded.args.creator,
+                totalAmount: totalAmountInUsdc,
+                platformFee,
+                creatorAmount,
+              })
+
               const { saveFundsReleaseToDatabase } = await import("@/lib/actions/campaigns")
-              await saveFundsReleaseToDatabase({
+              const saveResult = await saveFundsReleaseToDatabase({
                 campaignId: campaign.id,
                 creatorAddress: fundsDecoded.args.creator as string,
                 totalAmount: totalAmountInUsdc,
@@ -325,13 +353,43 @@ export function useCampaignContract(campaignId?: number) {
                 txHash: finalizeHash,
               })
 
-              console.log("[v0] Funds release saved to database")
-              toast.success(`Funds released! You received $${creatorAmount.toFixed(2)} USDC`)
+              console.log("[v0] Funds release saved to database:", saveResult)
+
+              if (saveResult.success) {
+                toast.success(`🎉 Funds released! You received $${creatorAmount.toFixed(2)} USDC`, {
+                  duration: 5000,
+                })
+              } else {
+                console.error("[v0] Failed to save funds release:", saveResult.error)
+                toast.error("Funds were released but failed to save to database")
+              }
+            } else {
+              console.error("[v0] FundsReleased event not found in transaction logs")
+              console.log(
+                "[v0] Available events in logs:",
+                receipt.logs.map((log, i) => {
+                  try {
+                    const decoded = decodeEventLog({
+                      abi: CAMPAIGN_ESCROW_ABI,
+                      data: log.data,
+                      topics: log.topics,
+                    })
+                    return `${i}: ${decoded.eventName}`
+                  } catch {
+                    return `${i}: unknown`
+                  }
+                }),
+              )
+              toast.warning("Campaign finalized but funds release event not found. Please check your wallet.")
             }
+          } else {
+            console.log("[v0] Campaign was not successful, refunds are now available")
+            toast.info("Campaign did not reach its goal. Backers can now claim refunds.")
           }
         }
       } catch (error) {
         console.error("[v0] Failed to update database after finalization:", error)
+        toast.error("Campaign finalized on blockchain but failed to update database")
       }
     },
   })
@@ -375,6 +433,9 @@ export function useCampaignContract(campaignId?: number) {
 
           if (result.success) {
             console.log("[v0] Refund saved to database successfully")
+            toast.success(`✅ Refund of $${amountInUsdc.toFixed(2)} USDC has been sent to your wallet!`, {
+              duration: 5000,
+            })
           } else {
             console.error("[v0] Failed to save refund to database:", result.error)
           }
@@ -385,7 +446,7 @@ export function useCampaignContract(campaignId?: number) {
     },
   })
 
-  const { data: pledgeRefundStatus } = useReadContract({
+  const { data: pledgeRefundStatus, refetch: refetchPledgeStatus } = useReadContract({
     address: escrowAddress,
     abi: CAMPAIGN_ESCROW_ABI,
     functionName: "getPledge",
@@ -566,6 +627,7 @@ export function useCampaignContract(campaignId?: number) {
     // Refetch
     refetchCampaign,
     refetchAllowance,
+    refetchPledgeStatus,
 
     // Extract campaign ID from receipt
     extractCampaignIdFromReceipt,

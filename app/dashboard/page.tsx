@@ -11,7 +11,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { DollarSign, Users, Heart, Target, Award, Plus, Clock, AlertCircle, TriangleAlert } from "lucide-react"
 import Link from "next/link"
 import { getCampaignsByCreator, getCampaignsByBacker, getUserPledgeStats } from "@/lib/actions/campaigns"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { formatCurrency, formatPercentage } from "@/lib/utils"
 
 interface Pledge {
@@ -103,7 +102,7 @@ const pieData = [
 ]
 
 export default function DashboardPage() {
-  const { address } = useAccount()
+  const { address, isConnected } = useAccount()
   const searchParams = useSearchParams()
   const newCampaignId = searchParams.get("newCampaign")
   const campaignSectionRef = useRef<HTMLDivElement>(null)
@@ -121,6 +120,8 @@ export default function DashboardPage() {
   useEffect(() => {
     if (address) {
       loadDashboardData()
+    } else {
+      setLoading(false)
     }
   }, [address])
 
@@ -193,18 +194,27 @@ export default function DashboardPage() {
     }
   }
 
-  if (!address) {
+  if (!isConnected || !address) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center bg-background pt-24">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
-            <CardTitle>Access Denied</CardTitle>
-            <CardDescription>Please connect your wallet to view your dashboard</CardDescription>
+            <CardTitle>Wallet Connection Required</CardTitle>
+            <CardDescription>Please connect your wallet to access your dashboard</CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <Button asChild>
-              <Link href="/handler/signin">Sign In</Link>
-            </Button>
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Your dashboard contains your campaigns, backed projects, and pledge statistics. Connect your wallet to
+              view this information.
+            </p>
+            <div className="flex flex-col gap-2">
+              <Button asChild variant="default">
+                <Link href="/">Connect Wallet</Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link href="/discover">Browse Campaigns</Link>
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -214,7 +224,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 py-8 pt-24">
           <div className="space-y-8">
             <div className="flex items-center space-x-4">
               <div className="h-16 w-16 rounded-full bg-muted animate-pulse" />
@@ -236,13 +246,13 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 space-y-8">
+      <div className="container mx-auto px-4 pt-24 pb-8 space-y-8">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder.svg" alt="" />
-              <AvatarFallback className="text-lg">U</AvatarFallback>
+              <AvatarImage src="/placeholder.svg" alt="User" />
+              <AvatarFallback className="text-lg">{address?.slice(2, 4).toUpperCase() || "U"}</AvatarFallback>
             </Avatar>
             <div>
               <h1 className="text-3xl font-bold text-foreground">Welcome back!</h1>
@@ -252,7 +262,7 @@ export default function DashboardPage() {
           <Button asChild>
             <Link href="/create">
               <Plus className="h-4 w-4 mr-2" />
-              Create Campaign
+              Start Campaign
             </Link>
           </Button>
         </div>
@@ -316,7 +326,7 @@ export default function DashboardPage() {
                 <h3 className="text-lg font-medium mb-2">No campaigns yet</h3>
                 <p className="text-muted-foreground mb-4">Create your first campaign to get started</p>
                 <Button asChild>
-                  <Link href="/create">Create Campaign</Link>
+                  <Link href="/create">Start Campaign</Link>
                 </Button>
               </div>
             ) : (
@@ -340,7 +350,7 @@ export default function DashboardPage() {
                         <div className="w-full rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-900/20 p-4 mb-4">
                           <div className="flex items-start gap-3">
                             <TriangleAlert className="h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
-                            <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                               <p className="font-medium text-amber-900 dark:text-amber-100">Campaign not live</p>
                               <p className="text-sm text-amber-800 dark:text-amber-200 leading-relaxed whitespace-normal break-words">
                                 This campaign is saved as a draft. Deploy it to the blockchain to make it live and start
@@ -352,27 +362,37 @@ export default function DashboardPage() {
                       )}
 
                       {canFinalize && (
-                        <Alert className="mb-4 border-blue-500 bg-blue-50 dark:bg-blue-950">
-                          <div className="flex items-center gap-3">
-                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                            <AlertDescription className="flex-1">
-                              <strong>Action Required:</strong> This campaign has reached its deadline. Click "View
-                              Campaign" to finalize it.
-                            </AlertDescription>
+                        <div
+                          data-action-required
+                          className="mb-4 rounded-md border border-blue-500 bg-blue-50 dark:bg-blue-950 p-4"
+                        >
+                          <div className="content flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                            <div className="text-col flex-1 min-w-0 w-full">
+                              <p className="block whitespace-normal break-words text-pretty leading-relaxed text-sm text-blue-900 dark:text-blue-100">
+                                <strong>Action Required:</strong> This campaign has reached its deadline. Click "View
+                                Campaign" to finalize it.
+                              </p>
+                            </div>
                           </div>
-                        </Alert>
+                        </div>
                       )}
 
                       {isFunded && (
-                        <Alert className="mb-4 border-green-500 bg-green-50 dark:bg-green-950">
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg flex-shrink-0">✅</span>
-                            <AlertDescription className="flex-1">
-                              <strong>Campaign Successful!</strong> Funds have been automatically released to your
-                              wallet.
-                            </AlertDescription>
+                        <div
+                          data-action-required
+                          className="mb-4 rounded-md border border-green-500 bg-green-50 dark:bg-green-950 p-4"
+                        >
+                          <div className="content flex items-start gap-3">
+                            <span className="text-lg shrink-0">✅</span>
+                            <div className="text-col flex-1 min-w-0 w-full">
+                              <p className="block whitespace-normal break-words text-pretty leading-relaxed text-sm text-green-900 dark:text-green-100">
+                                <strong>Campaign Successful!</strong> Funds have been automatically released to your
+                                wallet.
+                              </p>
+                            </div>
                           </div>
-                        </Alert>
+                        </div>
                       )}
 
                       <div className="flex items-start justify-between mb-4">
@@ -476,15 +496,20 @@ export default function DashboardPage() {
                       className="border-2 border-zinc-700 dark:border-zinc-600 rounded-lg p-6 shadow-sm"
                     >
                       {canClaimRefund && (
-                        <Alert className="mb-4 border-orange-500 bg-orange-50 dark:bg-orange-950">
-                          <div className="flex items-center gap-3">
-                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
-                            <AlertDescription className="flex-1">
-                              <strong>Refund Available:</strong> This campaign did not reach its goal. You can claim
-                              your refund.
-                            </AlertDescription>
+                        <div
+                          data-action-required
+                          className="mb-4 rounded-md border border-orange-500 bg-orange-50 dark:bg-orange-950 p-4"
+                        >
+                          <div className="content flex items-start gap-3">
+                            <AlertCircle className="h-5 w-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                            <div className="text-col flex-1 min-w-0 w-full">
+                              <p className="block whitespace-normal break-words text-pretty leading-relaxed text-sm text-orange-900 dark:text-orange-100">
+                                <strong>Refund Available:</strong> This campaign did not reach its goal. You can claim
+                                your refund.
+                              </p>
+                            </div>
                           </div>
-                        </Alert>
+                        </div>
                       )}
 
                       <div className="flex items-start justify-between mb-4">

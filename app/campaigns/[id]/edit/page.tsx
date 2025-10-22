@@ -494,7 +494,7 @@ export default function EditCampaignPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <div className="container mx-auto px-4 py-8">
+        <div className="container mx-auto px-4 pt-20 pb-8">
           <div className="space-y-8">
             <div className="h-8 w-64 bg-muted animate-pulse rounded" />
             <Card>
@@ -524,7 +524,7 @@ export default function EditCampaignPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 pt-24 pb-8">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">

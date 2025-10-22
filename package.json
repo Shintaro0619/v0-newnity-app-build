@@ -93,6 +93,7 @@
     "lucide-react": "^0.454.0",
     "next": "14.2.16",
     "next-themes": "latest",
+    "node-fetch": "latest",
     "permissionless": "^0.1.44",
     "prisma": "latest",
     "react": "^18",
