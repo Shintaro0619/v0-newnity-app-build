@@ -217,3 +217,5 @@ export const CAMPAIGN_ESCROW_ABI = [
     type: "function",
   },
 ] as const
+
+export default CAMPAIGN_ESCROW_ABI

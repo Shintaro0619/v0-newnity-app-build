@@ -405,7 +405,7 @@ export function PledgeModalV2({
                 <Label htmlFor="tier-amount">Pledge Amount (USDC)</Label>
                 <div className="relative">
                   <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input id="tier-amount" type="text" value={amount} className="pl-10 bg-muted" disabled />
+                  <Input id="tier-amount" type="text" value={formatUSDC(amount)} className="pl-10 bg-muted" disabled />
                 </div>
                 {usdcBalance && (
                   <p className="text-xs text-muted-foreground mt-1">

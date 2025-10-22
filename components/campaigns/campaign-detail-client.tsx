@@ -314,65 +314,65 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       setFinalizeAttempting(true)
       console.log("[v0] [CLIENT] Calling handleFinalize with campaignId:", blockchainId)
 
+      syncAttempted.current = false
+      console.log("[v0] [CLIENT] Reset sync gate")
+
       handleFinalize(blockchainId)
 
-      console.log("[v0] [CLIENT] Waiting for transaction hash...")
+      console.log("[v0] [CLIENT] Waiting for transaction hash from hook...")
       let txHash: string | null = null
-      for (let i = 0; i < 60; i++) {
+      for (let i = 0; i < 240; i++) {
         await new Promise((resolve) => setTimeout(resolve, 500))
         if (contractHook.finalizeHash) {
           txHash = contractHook.finalizeHash
+          console.log("[v0] [CLIENT] Transaction hash received from hook:", txHash)
           break
         }
       }
 
       if (!txHash) {
-        throw new Error("Transaction hash not available after 30 seconds")
+        console.warn("[v0] [CLIENT] Transaction hash not available after 120 seconds, proceeding with optimistic sync")
+      } else {
+        console.log("[v0] [CLIENT] Finalize transaction hash:", txHash)
+        console.log("[v0] [CLIENT] View on BaseScan: https://sepolia.basescan.org/tx/" + txHash)
+        setFinalizeTransactionHash(txHash)
+
+        console.log("[v0] [CLIENT] Waiting for transaction receipt...")
+        if (!publicClient) {
+          throw new Error("Public client not available")
+        }
+
+        try {
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash as `0x${string}`,
+            confirmations: 1,
+            timeout: 120_000, // 120 seconds
+          })
+
+          console.log("[v0] [CLIENT] Transaction receipt received:", {
+            status: receipt.status,
+            blockNumber: receipt.blockNumber,
+          })
+
+          if (receipt.status !== "success") {
+            throw new Error("Finalize transaction failed on blockchain")
+          }
+        } catch (waitErr) {
+          console.warn("[v0] [CLIENT] waitForTransactionReceipt timeout, proceeding with optimistic sync", waitErr)
+        }
       }
 
-      console.log("[v0] [CLIENT] Finalize transaction hash:", txHash)
-      console.log("[v0] [CLIENT] View on BaseScan: https://sepolia.basescan.org/tx/" + txHash)
-      setFinalizeTransactionHash(txHash)
+      console.log("[v0] [CLIENT] Calling syncCampaignFromChain with campaignId:", blockchainId)
 
-      console.log("[v0] [CLIENT] Waiting for transaction receipt...")
-      if (!publicClient) {
-        throw new Error("Public client not available")
-      }
+      const { syncCampaignFromChain } = await import("@/lib/actions/sync-campaign")
+      const syncResult = await syncCampaignFromChain(blockchainId)
 
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: txHash as `0x${string}`,
-        confirmations: 1,
-      })
-
-      console.log("[v0] [CLIENT] Transaction receipt received:", {
-        status: receipt.status,
-        blockNumber: receipt.blockNumber,
-      })
-
-      if (receipt.status !== "success") {
-        throw new Error("Finalize transaction failed on blockchain")
-      }
-
-      console.log("[v0] [CLIENT] Receipt confirmed, calling after-finalize API")
-
-      const syncResponse = await fetch(`/api/campaigns/${blockchainId}/after-finalize`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ txHash, chainId: blockchainId }),
-        cache: "no-store",
-      })
-
-      const syncResult = await syncResponse.json()
-      console.log("[v0] [CLIENT] after-finalize API result:", syncResult)
-
-      if (!syncResult.ok) {
-        throw new Error(syncResult.error || "Failed to sync blockchain state")
-      }
+      console.log("[v0] [CLIENT] Sync result:", syncResult)
 
       for (let attempt = 1; attempt <= 7; attempt++) {
         console.log(`[v0] [CLIENT] Polling attempt ${attempt}/7`)
 
-        if (syncResult.chain?.finalized) {
+        if (syncResult.finalized) {
           console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
           break
         }
@@ -381,17 +381,10 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
           console.log("[v0] [CLIENT] Not finalized yet, waiting 2s before next poll...")
           await new Promise((resolve) => setTimeout(resolve, 2000))
 
-          const pollResponse = await fetch(`/api/campaigns/${blockchainId}/after-finalize`, {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ chainId: blockchainId }),
-            cache: "no-store",
-          })
-
-          const pollResult = await pollResponse.json()
+          const pollResult = await syncCampaignFromChain(blockchainId)
           console.log(`[v0] [CLIENT] Poll result (attempt ${attempt}):`, pollResult)
 
-          if (pollResult.ok && pollResult.chain?.finalized) {
+          if (pollResult.finalized) {
             console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
             Object.assign(syncResult, pollResult)
             break
@@ -404,7 +397,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       router.refresh()
 
       toast.success(
-        `Campaign finalized successfully! ${syncResult.chain?.successful ? "Funds have been released to your wallet." : "Refunds are now available for backers."}`,
+        `Campaign finalized successfully! ${syncResult.successful ? "Funds have been released to your wallet." : "Refunds are now available for backers."}`,
         { duration: 5000 },
       )
 
@@ -506,7 +499,33 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     syncAttempted.current = false
+    console.log("[v0] Reset sync gate, waiting 5 seconds for blockchain update")
+
+    await new Promise((resolve) => setTimeout(resolve, 5000))
+
+    if (blockchainFunding) {
+      const pledgeAmount = Number.parseFloat(pledgeData.amount)
+      const updatedRaised = blockchainFunding.raised + pledgeAmount
+
+      setBlockchainFunding({
+        raised: updatedRaised,
+        goal: blockchainFunding.goal,
+        backers: blockchainFunding.backers,
+      })
+
+      console.log("[v0] Blockchain funding updated optimistically:", {
+        raised: updatedRaised,
+        goal: blockchainFunding.goal,
+        backers: blockchainFunding.backers,
+      })
+    }
+
     await refreshCampaignData()
+
+    console.log("[v0] Forcing blockchain data refetch")
+    syncAttempted.current = false
+
+    setBlockchainFunding((prev) => (prev ? { ...prev } : null))
   }
 
   const displayRaised = blockchainFunding?.raised ?? (Number(campaign.raised_amount) || 0)
@@ -724,7 +743,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                         className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.979 6.98 1.281-.059 1.689-.073 4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.684.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.979 6.98 1.281-.059 1.689-.073 4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                         </svg>
                         <span className="text-sm font-medium">Instagram</span>
                       </a>
@@ -1012,6 +1031,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
           campaignId={BigInt(blockchainId)}
           campaignTitle={campaign.title}
           campaignDbId={campaign.id}
+          minContribution={campaign.minContributionUsdc ? Number(campaign.minContributionUsdc) : 1000000}
           onClose={() => setShowPledgeModal(false)}
           onSuccess={handlePledgeSuccess}
         />
