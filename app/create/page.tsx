@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { useAccount } from "wagmi"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,6 +21,9 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { MediaUpload } from "@/components/ui/media-upload"
 import { Save, ImageIcon, Target, Users, DollarSign, Plus, Trash2, ArrowLeft, CalendarIcon } from "lucide-react"
+
+import { useTierScrollGuard } from "@/components/hooks/useTierScrollGuard"
+import { usdToUsdc } from "@/lib/utils/money" // Import usdToUsdc
 
 const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
   ssr: false,
@@ -146,10 +149,65 @@ export default function CreateCampaignPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
-  // const rewardTiersEndRef = useRef<HTMLDivElement>(null)
+  const tierRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const setTierRef = (id: string) => (el: HTMLDivElement | null) => {
+    tierRefs.current[id] = el
+  }
+  const [lastAddedId, setLastAddedId] = useState<string | null>(null)
+
+  const tiersContainerRef = useRef<HTMLDivElement>(null)
+  useTierScrollGuard(tiersContainerRef, [campaignData.rewards])
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
+
+  useEffect(() => {
+    const isTyping = (el: EventTarget | null) => {
+      if (!el) return false
+      const node = el as HTMLElement
+      return !!node.closest('input, textarea, [contenteditable="true"]')
+    }
+
+    const onKey = (e: KeyboardEvent) => {
+      // If user is typing in an input field, don't trigger shortcuts
+      if (isTyping(e.target)) return
+
+      // Prevent number keys from switching tabs
+      if (e.key === "1" || e.key === "2" || e.key === "3" || e.key === "4") {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+    }
+
+    window.addEventListener("keydown", onKey, true) // Use capture phase
+    return () => window.removeEventListener("keydown", onKey, true)
+  }, [])
+
+  useEffect(() => {
+    const onHash = () => console.log("[debug] hashchange:", location.hash)
+    const onPop = () => console.log("[debug] popstate")
+
+    window.addEventListener("hashchange", onHash)
+    window.addEventListener("popstate", onPop)
+
+    return () => {
+      window.removeEventListener("hashchange", onHash)
+      window.removeEventListener("popstate", onPop)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!lastAddedId) return
+    const el = tierRefs.current[lastAddedId]
+    // Wait 2 frames for DOM to be fully rendered (StrictMode/re-render protection)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        el?.scrollIntoView({ behavior: "smooth", block: "center" })
+        el?.querySelector<HTMLInputElement>('input[name="tier-title"]')?.focus({ preventScroll: true })
+        setLastAddedId(null)
+      })
+    })
+  }, [lastAddedId])
 
   const RewardTierCard = ({
     tier,
@@ -187,8 +245,8 @@ export default function CreateCampaignPage() {
       <Card className="border-2 border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-lg">Reward Tier</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onDelete}>
-            <span className="text-2xl">🗑️</span>
+          <Button variant="ghost" size="sm" onClick={onDelete} type="button">
+            <Trash2 className="h-4 w-4" />
           </Button>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -196,6 +254,7 @@ export default function CreateCampaignPage() {
             <div className="space-y-2">
               <Label>Title *</Label>
               <Input
+                name="tier-title"
                 value={localTitle}
                 onChange={(e) => setLocalTitle(e.target.value)}
                 onBlur={handleTitleBlur}
@@ -236,6 +295,7 @@ export default function CreateCampaignPage() {
               <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
+                    type="button"
                     variant="outline"
                     className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
                   >
@@ -254,7 +314,6 @@ export default function CreateCampaignPage() {
                       }
                     }}
                     disabled={(date) => date < new Date()}
-                    initialFocus
                   />
                 </PopoverContent>
               </Popover>
@@ -274,8 +333,17 @@ export default function CreateCampaignPage() {
               {tier.isLimited && (
                 <Input
                   type="number"
-                  value={tier.quantity || ""}
-                  onChange={(e) => onUpdate({ ...tier, quantity: Number(e.target.value) || null })}
+                  name="tier-quantity"
+                  min={0}
+                  step={1}
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  value={tier.quantity ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value === "" ? null : Number(e.target.value)
+                    onUpdate({ ...tier, quantity: Number.isFinite(v) ? v : null })
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   placeholder="100"
                   className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                 />
@@ -325,7 +393,7 @@ export default function CreateCampaignPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-lg">Milestone {index + 1}</CardTitle>
-          <Button variant="ghost" size="sm" onClick={onDelete}>
+          <Button variant="ghost" size="sm" onClick={onDelete} type="button">
             <Trash2 className="h-4 w-4" />
           </Button>
         </CardHeader>
@@ -366,7 +434,6 @@ export default function CreateCampaignPage() {
                   selected={milestone.targetDate}
                   onSelect={handleDateSelect}
                   disabled={(date) => date < new Date()}
-                  initialFocus
                 />
               </PopoverContent>
             </Popover>
@@ -378,7 +445,7 @@ export default function CreateCampaignPage() {
 
   const addRewardTier = () => {
     const newTier: RewardTier = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       title: "",
       description: "",
       amount: 0,
@@ -391,6 +458,8 @@ export default function CreateCampaignPage() {
       ...prev,
       rewards: [...prev.rewards, newTier],
     }))
+
+    setLastAddedId(newTier.id)
   }
 
   const updateRewardTier = (index: number, updatedTier: RewardTier) => {
@@ -514,6 +583,9 @@ export default function CreateCampaignPage() {
         ? Math.ceil((campaignData.funding.endDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
         : 30
 
+      const minPledgeUsd = Number(campaignData.funding.minPledge) || 1
+      const minContributionUsdc = usdToUsdc(minPledgeUsd)
+
       formData.append(
         "data",
         JSON.stringify({
@@ -524,6 +596,7 @@ export default function CreateCampaignPage() {
           funding: {
             ...campaignData.funding,
             duration,
+            minContributionUsdc, // Add minContributionUsdc to payload
           },
           rewards: campaignData.rewards.map((reward) => ({
             ...reward,
@@ -585,7 +658,7 @@ export default function CreateCampaignPage() {
       const result = await response.json()
       console.log("[v0] Campaign created successfully:", result)
 
-      router.push(`/dashboard?newCampaign=${result.campaignId}`)
+      router.push(`/dashboard?newCampaign=${result.campaignId}`, { scroll: false })
     } catch (error) {
       console.error("[v0] Campaign creation failed:", error)
       setErrors({ submit: error instanceof Error ? error.message : "Failed to create campaign" })
@@ -960,7 +1033,7 @@ export default function CreateCampaignPage() {
                             className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                           />
                           <p className="text-xs text-muted-foreground">
-                            Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/shorts
+                            Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/embed/
                             links.
                           </p>
                         </div>
@@ -1035,6 +1108,7 @@ export default function CreateCampaignPage() {
                           <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
                             <PopoverTrigger asChild>
                               <Button
+                                type="button"
                                 variant="outline"
                                 className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
                               >
@@ -1060,7 +1134,6 @@ export default function CreateCampaignPage() {
                                   }
                                 }}
                                 disabled={(date) => date < new Date()}
-                                initialFocus
                               />
                             </PopoverContent>
                           </Popover>
@@ -1120,7 +1193,7 @@ export default function CreateCampaignPage() {
                           </CardTitle>
                           <CardDescription>Create reward tiers for your backers</CardDescription>
                         </div>
-                        <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
+                        <Button onClick={addRewardTier} type="button" className="bg-primary hover:bg-primary/90">
                           <Plus className="h-4 w-4 mr-2" />
                           Add Tier
                         </Button>
@@ -1136,14 +1209,16 @@ export default function CreateCampaignPage() {
                         </Alert>
                       )}
 
-                      <div className="space-y-6">
+                      <div ref={tiersContainerRef} className="tiers-editor space-y-6">
                         {campaignData.rewards.map((tier, index) => (
-                          <RewardTierCard
-                            key={tier.id}
-                            tier={tier}
-                            onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
-                            onDelete={() => deleteRewardTier(index)}
-                          />
+                          <div key={tier.id} ref={setTierRef(tier.id)}>
+                            <div className="mb-2 text-sm text-muted-foreground">Reward Tier {index + 1}</div>
+                            <RewardTierCard
+                              tier={tier}
+                              onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
+                              onDelete={() => deleteRewardTier(index)}
+                            />
+                          </div>
                         ))}
 
                         {campaignData.rewards.length === 0 && (
@@ -1154,7 +1229,7 @@ export default function CreateCampaignPage() {
                               <p className="text-muted-foreground mb-4">
                                 Create reward tiers to incentivize backers and offer value for their support.
                               </p>
-                              <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
+                              <Button onClick={addRewardTier} type="button" className="bg-primary hover:bg-primary/90">
                                 <Plus className="h-4 w-4 mr-2" />
                                 Create Your First Tier
                               </Button>
@@ -1169,10 +1244,11 @@ export default function CreateCampaignPage() {
 
               {/* Action Buttons */}
               <div className="flex justify-between pt-6">
-                <Button variant="outline" asChild>
+                <Button variant="outline" asChild type="button">
                   <Link href="/dashboard">Cancel</Link>
                 </Button>
                 <Button
+                  type="button"
                   onClick={handleSubmit}
                   disabled={loading || !isConnected}
                   className={!isConnected ? "opacity-50 cursor-not-allowed" : ""}

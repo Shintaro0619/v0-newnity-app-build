@@ -11,7 +11,11 @@ export async function POST(request: NextRequest) {
     // Validate campaign is active and not ended
     const campaign = await prisma.campaign.findUnique({
       where: { id: campaignId },
-      select: { status: true, endDate: true },
+      select: {
+        status: true,
+        endDate: true,
+        minContributionUsdc: true, // Fetch min_contribution_usdc
+      },
     })
 
     if (!campaign || campaign.status !== "ACTIVE") {
@@ -20,6 +24,17 @@ export async function POST(request: NextRequest) {
 
     if (campaign.endDate && new Date() > campaign.endDate) {
       return NextResponse.json({ error: "Campaign has ended" }, { status: 400 })
+    }
+
+    const minContributionUsdc = campaign.minContributionUsdc || 1_000_000 // Default to $1
+    const amountUsdc = Math.round(amount * 1_000_000) // Convert USD to USDC atomic units
+    if (amountUsdc < minContributionUsdc) {
+      return NextResponse.json(
+        {
+          error: `Below minimum pledge ($${minContributionUsdc / 1_000_000})`,
+        },
+        { status: 400 },
+      )
     }
 
     let tier = null

@@ -28,6 +28,7 @@ export interface Campaign {
   updated_at: Date
   blockchain_campaign_id?: number
   deadline_input_type?: string
+  min_contribution_usdc?: number
 }
 
 export async function ensureUserExists(walletAddress: string) {
@@ -256,6 +257,7 @@ export async function getCampaigns(filters?: {
     return campaigns.map((campaign) => ({
       ...campaign,
       blockchainCampaignId: campaign.blockchain_campaign_id,
+      minContributionUsdc: campaign.min_contribution_usdc,
     }))
   } catch (error) {
     console.error("[v0] Error fetching campaigns:", error)
@@ -291,6 +293,7 @@ export async function getCampaignById(id: string) {
     return {
       ...campaign,
       blockchainCampaignId: campaign.blockchain_campaign_id,
+      minContributionUsdc: campaign.min_contribution_usdc,
       creator: {
         name: campaign.creator_name,
         avatar: campaign.creator_avatar,
@@ -318,6 +321,7 @@ export async function createCampaign(data: {
   duration: number
   contract_tx_hash?: string
   escrow_address?: string
+  min_contribution_usdc?: number
 }) {
   try {
     const userId = await ensureUserExists(data.creator_id)
@@ -325,6 +329,8 @@ export async function createCampaign(data: {
     const startDate = new Date()
     const deadlineTimestamp = calculateDeadline(startDate, data.duration)
     const endDate = new Date(deadlineTimestamp * 1000)
+
+    const minContributionUsdc = data.min_contribution_usdc ?? 1000000
 
     const result = await sql`
       INSERT INTO campaigns (
@@ -348,6 +354,7 @@ export async function createCampaign(data: {
         platform_fee,
         contract_tx_hash,
         escrow_address,
+        min_contribution_usdc,
         created_at,
         updated_at
       ) VALUES (
@@ -371,6 +378,7 @@ export async function createCampaign(data: {
         5,
         ${data.contract_tx_hash || null},
         ${data.escrow_address || null},
+        ${minContributionUsdc},
         NOW(),
         NOW()
       )
@@ -381,6 +389,7 @@ export async function createCampaign(data: {
       duration: data.duration,
       endDate: endDate.toISOString(),
       deadlineTimestamp,
+      min_contribution_usdc: minContributionUsdc,
     })
 
     return result[0]
@@ -562,6 +571,7 @@ export async function getCampaignsByCreator(creatorWalletAddress: string) {
     return campaigns.map((campaign) => ({
       ...campaign,
       blockchainCampaignId: campaign.blockchain_campaign_id,
+      minContributionUsdc: campaign.min_contribution_usdc,
     }))
   } catch (error) {
     console.error("[v0] Error fetching creator campaigns:", error)

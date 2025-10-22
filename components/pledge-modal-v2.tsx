@@ -15,6 +15,7 @@ import { getCampaignTiers } from "@/lib/actions/campaigns"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Badge } from "@/components/ui/badge"
 import { isTierAvailable, getTierStatusMessage, fromAtomicUsdc, formatUSDC } from "@/lib/utils/tier-utils"
+import { usdcToUsd } from "@/lib/utils/money"
 
 interface PledgeModalV2Props {
   campaignId: bigint
@@ -102,6 +103,8 @@ export function PledgeModalV2({
     loadTiers()
   }, [campaignDbId])
 
+  const minAmountUsd = usdcToUsd(minContribution)
+
   useEffect(() => {
     if (selectedTierId && !customAmount) {
       const selectedTier = tiers.find((t) => t.id === selectedTierId)
@@ -109,10 +112,9 @@ export function PledgeModalV2({
         setAmount(selectedTier.amount.toString())
       }
     } else if (customAmount) {
-      // Set to minimum contribution when "pledge without reward" is selected
-      setAmount(fromAtomicUsdc(minContribution).toString())
+      setAmount(minAmountUsd.toString())
     }
-  }, [selectedTierId, tiers, customAmount, minContribution])
+  }, [selectedTierId, tiers, customAmount, minAmountUsd])
 
   const resetForm = () => {
     setAmount("")
@@ -168,7 +170,7 @@ export function PledgeModalV2({
     }
 
     const selectedTier = tiers.find((t) => t.id === selectedTierId)
-    const minAmount = selectedTier ? selectedTier.amount : fromAtomicUsdc(minContribution)
+    const minAmount = selectedTier ? selectedTier.amount : minAmountUsd
     if (Number.parseFloat(amount) < minAmount) {
       alert(`Minimum pledge amount is $${minAmount}`)
       return
@@ -380,11 +382,11 @@ export function PledgeModalV2({
                   <Input
                     id="amount"
                     type="number"
-                    placeholder={`Minimum: ${formatUSDC(fromAtomicUsdc(minContribution))}`}
+                    placeholder={`Minimum: ${formatUSDC(minAmountUsd)}`}
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     className="pl-10"
-                    min={fromAtomicUsdc(minContribution)}
+                    min={minAmountUsd}
                     step="0.01"
                     disabled={!campaignExistsOnChain}
                   />
@@ -394,9 +396,7 @@ export function PledgeModalV2({
                     Balance: {formatUSDC(formatUnits(usdcBalance, 6))} USDC
                   </p>
                 )}
-                <p className="text-xs text-muted-foreground mt-1">
-                  Minimum pledge: ${formatUSDC(fromAtomicUsdc(minContribution))}
-                </p>
+                <p className="text-xs text-muted-foreground mt-1">Minimum pledge: ${formatUSDC(minAmountUsd)}</p>
               </div>
             )}
 
@@ -425,9 +425,7 @@ export function PledgeModalV2({
                 !hasEnoughBalance ||
                 Number.parseFloat(amount) <= 0 ||
                 Number.parseFloat(amount) <
-                  (selectedTierId
-                    ? tiers.find((t) => t.id === selectedTierId)?.amount || 0
-                    : fromAtomicUsdc(minContribution)) ||
+                  (selectedTierId ? tiers.find((t) => t.id === selectedTierId)?.amount || 0 : minAmountUsd) ||
                 !campaignExistsOnChain
               }
               className="w-full bg-[#1DB954] hover:bg-[#1DB954]/90 text-white"

@@ -43,6 +43,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Creator address is required" }, { status: 400 })
     }
 
+    const minContributionUsdc =
+      funding.minPledge && funding.minPledge > 0 ? Math.floor(funding.minPledge * 1000000) : 1000000
+
+    console.log("[v0] Min contribution calculation:", {
+      minPledge: funding.minPledge,
+      minContributionUsdc,
+    })
+
     console.log("[v0] Starting parallel image uploads...")
     const uploadStartTime = Date.now()
 
@@ -110,6 +118,7 @@ export async function POST(request: NextRequest) {
       duration: funding.duration,
       contract_tx_hash: undefined,
       escrow_address: undefined,
+      min_contribution_usdc: minContributionUsdc,
     })
 
     const dbEndTime = Date.now()

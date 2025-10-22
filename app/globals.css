@@ -145,6 +145,8 @@
   }
   html {
     scroll-behavior: smooth;
+    /* Prevent browser's automatic scroll position correction */
+    overflow-anchor: none;
   }
 }
 
