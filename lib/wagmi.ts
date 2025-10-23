@@ -50,20 +50,36 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
+const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || process.env.NEXT_PUBLIC_WC_PROJECT_ID // Removed temporary hardcoded value
+
+// Debug logging for environment variables (only in browser)
+if (typeof window !== "undefined") {
+  console.log("[v0] WalletConnect Project ID present:", Boolean(projectId))
+  console.log("[v0] WalletConnect Project ID value:", projectId)
+  console.log("[v0] Environment check:", {
+    hasWalletConnectProjectId: Boolean(process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID),
+    hasWcProjectId: Boolean(process.env.NEXT_PUBLIC_WC_PROJECT_ID),
+  })
+}
+
 export const config = createConfig({
   chains: SUPPORTED_CHAINS,
   connectors: [
     injected(),
-    walletConnect({
-      projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "",
-      showQrModal: true,
-      metadata: {
-        name: "newnity",
-        description: "USDC crowdfunding platform with FanFi layer",
-        url: process.env.NEXT_PUBLIC_APP_URL || "https://newnity.vercel.app",
-        icons: ["https://newnity.vercel.app/icon.png"],
-      },
-    }),
+    ...(projectId
+      ? [
+          walletConnect({
+            projectId,
+            showQrModal: true,
+            metadata: {
+              name: "newnity",
+              description: "USDC crowdfunding platform with FanFi layer",
+              url: process.env.NEXT_PUBLIC_APP_URL || "https://newnity.vercel.app",
+              icons: ["https://newnity.vercel.app/icon.png"],
+            },
+          }),
+        ]
+      : []),
   ],
   transports: {
     [baseSepoliaCustom.id]: http(),

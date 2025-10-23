@@ -54,6 +54,14 @@ export function WalletConnectButton({ className }: { className?: string }) {
       "[v0] Available wallet connectors:",
       connectors.map((c) => ({ id: c.id, name: c.name, type: c.type })),
     )
+    const hasWalletConnect = connectors.some(
+      (c) => c.id === "walletConnect" || c.name.toLowerCase().includes("walletconnect"),
+    )
+    if (!hasWalletConnect) {
+      console.warn(
+        "[v0] WalletConnect connector not found. Please check NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID environment variable.",
+      )
+    }
   }, [connectors])
 
   useEffect(() => {
