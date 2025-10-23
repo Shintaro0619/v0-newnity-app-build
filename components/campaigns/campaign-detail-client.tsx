@@ -119,11 +119,24 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
         const raised = Number(formatUnits(raisedBigInt, 6))
         const goal = Number(formatUnits(goalBigInt, 6))
 
-        setBlockchainFunding({
-          raised,
-          goal,
-          backers: 0,
-        })
+        const currentRaised = blockchainFunding?.raised ?? 0
+        const raisedDb = Number(campaign.raised_amount) || 0
+
+        // Only update blockchain funding if chain value is greater than both current and DB
+        if (raised >= Math.max(currentRaised, raisedDb)) {
+          setBlockchainFunding({
+            raised,
+            goal,
+            backers: 0,
+          })
+          console.log("[v0] Blockchain funding updated (monotonic increase):", { raised, goal })
+        } else {
+          console.log("[v0] Skipping blockchain funding update (chain value lower than DB):", {
+            chainRaised: raised,
+            dbRaised: raisedDb,
+            currentRaised,
+          })
+        }
 
         console.log("[v0] Checking if status update is needed:", {
           isFinalized: campaignData.finalized,
@@ -499,38 +512,22 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
     }
 
     syncAttempted.current = false
-    console.log("[v0] Reset sync gate, waiting 5 seconds for blockchain update")
+    console.log("[v0] Reset sync gate for blockchain update")
 
-    await new Promise((resolve) => setTimeout(resolve, 5000))
-
-    if (blockchainFunding) {
-      const pledgeAmount = Number.parseFloat(pledgeData.amount)
-      const updatedRaised = blockchainFunding.raised + pledgeAmount
-
-      setBlockchainFunding({
-        raised: updatedRaised,
-        goal: blockchainFunding.goal,
-        backers: blockchainFunding.backers,
-      })
-
-      console.log("[v0] Blockchain funding updated optimistically:", {
-        raised: updatedRaised,
-        goal: blockchainFunding.goal,
-        backers: blockchainFunding.backers,
-      })
-    }
+    await new Promise((resolve) => setTimeout(resolve, 3000))
 
     await refreshCampaignData()
 
-    console.log("[v0] Forcing blockchain data refetch")
-    syncAttempted.current = false
-
-    setBlockchainFunding((prev) => (prev ? { ...prev } : null))
+    // The useEffect will refetch blockchain data and merge with DB using max() logic
   }
 
-  const displayRaised = blockchainFunding?.raised ?? (Number(campaign.raised_amount) || 0)
+  const raisedDb = Number(campaign.raised_amount) || 0
+  const raisedChain = blockchainFunding?.raised ?? 0
+  const displayRaised = Math.max(raisedDb, raisedChain)
+
   const displayGoal = blockchainFunding?.goal ?? (Number(campaign.goal_amount) || 0)
   const progressPercentage = displayGoal > 0 ? (displayRaised / displayGoal) * 100 : 0
+
   const daysLeft =
     campaign.daysLeft ||
     Math.max(0, Math.floor((new Date(campaign.end_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
@@ -743,7 +740,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                         className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.684.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.979 6.98 1.281-.059 1.689-.073 4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.059-1.684.07-4.85.07-3.204 0-3.584-.012-4.849-.07-4.358-.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.979 6.98 1.281-.059 1.689-.073 4.948-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                         </svg>
                         <span className="text-sm font-medium">Instagram</span>
                       </a>
