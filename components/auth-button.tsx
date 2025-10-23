@@ -1,6 +1,6 @@
 "use client"
 
-import { useAccount } from "wagmi"
+import { useAccount, useDisconnect } from "wagmi"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -11,62 +11,58 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { User, LayoutDashboard, Settings } from "lucide-react"
+import { User, LayoutDashboard, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
 import { getUserProfile } from "@/app/settings/actions"
 
 export function AuthButton() {
   const { address, isConnected } = useAccount()
+  const { disconnect } = useDisconnect()
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
-    console.log("[v0] [AUTH_BUTTON] Connection state:", { isConnected, address })
-  }, [isConnected, address])
+    if (!isConnected || !address) {
+      console.log("[v0] [AUTH_BUTTON] Clearing profile - wallet disconnected")
+      setUserProfile(null)
+      return
+    }
 
-  useEffect(() => {
     async function loadProfile() {
-      if (address && isConnected) {
-        setUserProfile(null)
-        setIsLoading(true)
-
-        try {
-          console.log("[v0] [CLIENT] Loading profile for:", address)
-          const data = await getUserProfile(address)
-          if (data.profile) {
-            console.log("[v0] [CLIENT] Profile loaded:", data.profile.name)
-            setUserProfile(data.profile)
-          } else {
-            console.log("[v0] [CLIENT] No profile found for:", address)
-          }
-        } catch (error) {
-          console.error("[v0] [CLIENT] Error loading profile:", error)
-        } finally {
-          setIsLoading(false)
+      setIsLoading(true)
+      try {
+        console.log("[v0] [AUTH_BUTTON] Loading profile for:", address)
+        const data = await getUserProfile(address)
+        if (data.profile) {
+          console.log("[v0] [AUTH_BUTTON] Profile loaded:", data.profile.name)
+          setUserProfile(data.profile)
+        } else {
+          console.log("[v0] [AUTH_BUTTON] No profile found for:", address)
+          setUserProfile(null)
         }
-      } else {
-        console.log("[v0] [CLIENT] Wallet disconnected, clearing profile")
+      } catch (error) {
+        console.error("[v0] [AUTH_BUTTON] Error loading profile:", error)
         setUserProfile(null)
+      } finally {
+        setIsLoading(false)
       }
     }
+
     loadProfile()
   }, [address, isConnected])
 
   if (!isConnected || !address) {
-    console.log("[v0] [AUTH_BUTTON] Not rendering - wallet not connected")
     return null
   }
 
   const displayName = `${address.slice(0, 6)}...${address.slice(-4)}`
-
   const profileMatches = userProfile?.wallet_address?.toLowerCase() === address?.toLowerCase()
   const showProfile = profileMatches && !isLoading
 
-  if (!showProfile && userProfile) {
-    console.log("[v0] [CLIENT] Profile/address mismatch, showing address-only:", {
-      profileAddress: userProfile?.wallet_address,
-      currentAddress: address,
-    })
+  const handleDisconnect = () => {
+    console.log("[v0] [AUTH_BUTTON] Disconnecting wallet")
+    setUserProfile(null)
+    disconnect()
   }
 
   return (
@@ -122,6 +118,14 @@ export function AuthButton() {
             <LayoutDashboard className="mr-2 h-4 w-4" />
             Dashboard
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="bg-gray-700" />
+        <DropdownMenuItem
+          onClick={handleDisconnect}
+          className="text-red-400 hover:bg-gray-800 hover:text-red-300 cursor-pointer"
+        >
+          <LogOut className="mr-2 h-4 w-4" />
+          Disconnect
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

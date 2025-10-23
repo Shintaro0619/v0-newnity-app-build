@@ -1,143 +1,26 @@
 "use client"
-
-import { useEffect } from "react"
-
 import { useState } from "react"
-
-import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
+import { useAccount, useConnect } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { SUPPORTED_CHAINS, getChainName, isChainSupported } from "@/lib/wagmi"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-
-type ConnectingListener = (isConnecting: boolean) => void
-const connectingListeners = new Set<ConnectingListener>()
-let currentConnectingState = false
-
-export function subscribeToConnecting(listener: ConnectingListener) {
-  connectingListeners.add(listener)
-  listener(currentConnectingState)
-  return () => {
-    connectingListeners.delete(listener)
-  }
-}
-
-function notifyConnectingListeners(isConnecting: boolean) {
-  currentConnectingState = isConnecting
-  connectingListeners.forEach((listener) => listener(isConnecting))
-}
 
 export function WalletConnectButton({ className }: { className?: string }) {
-  const { address, isConnected, chain } = useAccount()
+  const { isConnected } = useAccount()
   const { connectors, connectAsync, status } = useConnect()
-  const { disconnect } = useDisconnect()
-  const { switchChain } = useSwitchChain()
   const { toast } = useToast()
-
   const [open, setOpen] = useState(false)
-  const [showChainSwitchDialog, setShowChainSwitchDialog] = useState(false)
-  const [targetChainId, setTargetChainId] = useState<number | null>(null)
 
-  useEffect(() => {
-    notifyConnectingListeners(status === "pending")
-  }, [status])
-
-  useEffect(() => {
-    if (isConnected && chain && !isChainSupported(chain.id)) {
-      console.log("[v0] Unsupported chain detected:", chain.id, chain.name)
-      setTargetChainId(SUPPORTED_CHAINS[0].id)
-      setShowChainSwitchDialog(true)
-    }
-  }, [isConnected, chain])
-
-  useEffect(() => {
-    console.log("[v0] [WALLET_BUTTON] Component state:", { isConnected, address, status })
-  }, [isConnected, address, status])
-
-  const handleChainSwitch = async () => {
-    if (!targetChainId) return
-
-    try {
-      console.log("[v0] Switching to chain:", targetChainId, getChainName(targetChainId))
-      await switchChain({ chainId: targetChainId })
-      toast({
-        title: "Network Switched",
-        description: `Switched to ${getChainName(targetChainId)}`,
-      })
-      setShowChainSwitchDialog(false)
-      setTargetChainId(null)
-    } catch (error) {
-      console.error("[v0] Chain switch failed:", error)
-      toast({
-        title: "Switch Failed",
-        description: error instanceof Error ? error.message : "Failed to switch network",
-        variant: "destructive",
-      })
-    }
+  if (isConnected) {
+    return null
   }
 
-  const handleChainSwitchCancel = () => {
-    setShowChainSwitchDialog(false)
-    setTargetChainId(null)
-    disconnect()
-    toast({
-      title: "Disconnected",
-      description: "Wallet disconnected due to unsupported network",
-      variant: "destructive",
-    })
-  }
-
-  if (isConnected && address) {
-    console.log("[v0] [WALLET_BUTTON] Rendering chain switch dialog only")
-    return (
-      <AlertDialog open={showChainSwitchDialog} onOpenChange={setShowChainSwitchDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Unsupported Network</AlertDialogTitle>
-            <AlertDialogDescription>
-              You are currently connected to <strong>{chain?.name || "an unsupported network"}</strong>.
-              <br />
-              <br />
-              This app only supports the following networks:
-              <ul className="list-disc list-inside mt-2">
-                {SUPPORTED_CHAINS.map((supportedChain) => (
-                  <li key={supportedChain.id}>{supportedChain.name}</li>
-                ))}
-              </ul>
-              <br />
-              Would you like to switch to{" "}
-              <strong>{targetChainId ? getChainName(targetChainId) : "a supported network"}</strong>?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={handleChainSwitchCancel}>Cancel & Disconnect</AlertDialogCancel>
-            <AlertDialogAction onClick={handleChainSwitch}>Switch Network</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    )
-  }
-
-  console.log("[v0] [WALLET_BUTTON] Rendering Connect Wallet button")
   return (
     <>
       <Button
-        onClick={() => {
-          console.log("[v0] Connect Wallet button clicked")
-          setOpen(true)
-        }}
-        className={cn("transition-colors hover:bg-green-600", className)}
+        onClick={() => setOpen(true)}
+        className={cn("bg-white/10 hover:bg-green-600 hover:text-black transition-colors", className)}
         disabled={status === "pending"}
       >
         {status === "pending" ? "Connecting..." : "Connect Wallet"}
@@ -181,10 +64,12 @@ export function WalletConnectButton({ className }: { className?: string }) {
               </Button>
             ))}
           </div>
-
-          <p className="text-xs text-muted-foreground mt-2">Status: {status}</p>
         </DialogContent>
       </Dialog>
     </>
   )
+}
+
+export function subscribeToConnecting(listener: (isConnecting: boolean) => void) {
+  return () => {}
 }

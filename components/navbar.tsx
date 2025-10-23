@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
-import { subscribeToConnecting } from "@/components/wallet-connect-button"
 import { AuthButton } from "@/components/auth-button"
 import { useAccount } from "wagmi"
 
@@ -27,20 +26,13 @@ const WalletConnectButton = dynamic(
 export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showMobileSearch, setShowMobileSearch] = useState(false)
-  const [isWalletConnecting, setIsWalletConnecting] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { isConnected, address } = useAccount()
 
   useEffect(() => {
-    const unsubscribe = subscribeToConnecting(setIsWalletConnecting)
-    return () => unsubscribe()
+    setMounted(true)
   }, [])
-
-  useEffect(() => {
-    console.log("[v0] [NAVBAR] Wallet connection state:", { isConnected, address })
-    console.log("[v0] [NAVBAR] Will render AuthButton:", isConnected && !!address)
-    console.log("[v0] [NAVBAR] Will render WalletConnectButton:", !isConnected)
-  }, [isConnected, address])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -133,17 +125,7 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          {isConnected && address ? (
-            <>
-              {console.log("[v0] [NAVBAR] Rendering AuthButton")}
-              <AuthButton />
-            </>
-          ) : (
-            <>
-              {console.log("[v0] [NAVBAR] Rendering WalletConnectButton")}
-              <WalletConnectButton />
-            </>
-          )}
+          {mounted && <>{isConnected && address ? <AuthButton /> : <WalletConnectButton />}</>}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>
