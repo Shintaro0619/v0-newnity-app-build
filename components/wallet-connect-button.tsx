@@ -230,19 +230,29 @@ export function WalletConnectButton({ className }: { className?: string }) {
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen} modal={false}>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen} modal={true}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
           size="sm"
-          className={cn("text-gray-300 border-gray-700 bg-transparent", className)}
+          className={cn(
+            "text-gray-300 border-gray-700 bg-transparent",
+            "hover:bg-green-600 hover:text-white hover:border-green-600",
+            "transition-all duration-200",
+            "cursor-pointer",
+            className,
+          )}
           disabled={isConnecting}
+          onClick={() => {
+            console.log("[v0] Connect Wallet button clicked")
+            setIsOpen(true)
+          }}
         >
           <span className="mr-2">👛</span>
           {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[60] mt-4">
+      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[9999] mt-4">
         {enhancedConnectors.length === 0 ? (
           <DropdownMenuItem disabled className="text-gray-500">
             No wallets available
