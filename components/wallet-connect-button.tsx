@@ -96,50 +96,31 @@ export function WalletConnectButton({ className }: { className?: string }) {
 
   if (isConnected && address) {
     return (
-      <>
-        <div className="flex items-center gap-2">
-          <div className="text-sm text-gray-400">
-            {address.slice(0, 6)}...{address.slice(-4)}
-          </div>
-          <Button
-            onClick={() => {
-              console.log("[v0] Disconnecting wallet")
-              disconnect()
-            }}
-            variant="outline"
-            size="sm"
-            className="text-gray-300 border-gray-700 hover:bg-gray-900"
-          >
-            Disconnect
-          </Button>
-        </div>
-
-        <AlertDialog open={showChainSwitchDialog} onOpenChange={setShowChainSwitchDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Unsupported Network</AlertDialogTitle>
-              <AlertDialogDescription>
-                You are currently connected to <strong>{chain?.name || "an unsupported network"}</strong>.
-                <br />
-                <br />
-                This app only supports the following networks:
-                <ul className="list-disc list-inside mt-2">
-                  {SUPPORTED_CHAINS.map((supportedChain) => (
-                    <li key={supportedChain.id}>{supportedChain.name}</li>
-                  ))}
-                </ul>
-                <br />
-                Would you like to switch to{" "}
-                <strong>{targetChainId ? getChainName(targetChainId) : "a supported network"}</strong>?
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel onClick={handleChainSwitchCancel}>Cancel & Disconnect</AlertDialogCancel>
-              <AlertDialogAction onClick={handleChainSwitch}>Switch Network</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </>
+      <AlertDialog open={showChainSwitchDialog} onOpenChange={setShowChainSwitchDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unsupported Network</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are currently connected to <strong>{chain?.name || "an unsupported network"}</strong>.
+              <br />
+              <br />
+              This app only supports the following networks:
+              <ul className="list-disc list-inside mt-2">
+                {SUPPORTED_CHAINS.map((supportedChain) => (
+                  <li key={supportedChain.id}>{supportedChain.name}</li>
+                ))}
+              </ul>
+              <br />
+              Would you like to switch to{" "}
+              <strong>{targetChainId ? getChainName(targetChainId) : "a supported network"}</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleChainSwitchCancel}>Cancel & Disconnect</AlertDialogCancel>
+            <AlertDialogAction onClick={handleChainSwitch}>Switch Network</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     )
   }
 
