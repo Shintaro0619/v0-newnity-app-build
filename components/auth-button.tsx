@@ -21,6 +21,10 @@ export function AuthButton() {
   const [isLoading, setIsLoading] = useState(false)
 
   useEffect(() => {
+    console.log("[v0] [AUTH_BUTTON] Connection state:", { isConnected, address })
+  }, [isConnected, address])
+
+  useEffect(() => {
     async function loadProfile() {
       if (address && isConnected) {
         setUserProfile(null)
@@ -41,6 +45,7 @@ export function AuthButton() {
           setIsLoading(false)
         }
       } else {
+        console.log("[v0] [CLIENT] Wallet disconnected, clearing profile")
         setUserProfile(null)
       }
     }
@@ -48,6 +53,7 @@ export function AuthButton() {
   }, [address, isConnected])
 
   if (!isConnected || !address) {
+    console.log("[v0] [AUTH_BUTTON] Not rendering - wallet not connected")
     return null
   }
 

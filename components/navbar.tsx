@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { subscribeToConnecting } from "@/components/wallet-connect-button"
 import { AuthButton } from "@/components/auth-button"
+import { useAccount } from "wagmi"
 
 const WalletConnectButton = dynamic(
   () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
@@ -28,11 +29,16 @@ export function Navbar() {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const [isWalletConnecting, setIsWalletConnecting] = useState(false)
   const router = useRouter()
+  const { isConnected, address } = useAccount()
 
   useEffect(() => {
     const unsubscribe = subscribeToConnecting(setIsWalletConnecting)
     return () => unsubscribe()
   }, [])
+
+  useEffect(() => {
+    console.log("[v0] [NAVBAR] Wallet connection state:", { isConnected, address })
+  }, [isConnected, address])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -125,9 +131,9 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          <AuthButton />
+          {isConnected && address && <AuthButton />}
 
-          <WalletConnectButton />
+          {!isConnected && <WalletConnectButton />}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>
