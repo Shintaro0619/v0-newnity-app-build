@@ -6,7 +6,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { SUPPORTED_CHAINS, getChainName, isChainSupported } from "@/lib/wagmi"
+import { SUPPORTED_CHAINS, getChainName, isChainSupported, config } from "@/lib/wagmi"
+import { walletConnect } from "wagmi/connectors"
+import { WC_PROJECT_ID } from "@/lib/publicEnv"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,6 +34,45 @@ function setGlobalConnecting(isConnecting: boolean) {
   connectingListeners.forEach((listener) => listener(isConnecting))
 }
 
+function getWalletConnectConnector() {
+  const list = config.connectors
+
+  // Log all connectors for debugging
+  if (typeof window !== "undefined") {
+    console.log(
+      "[v0] Connectors detail:",
+      list.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
+    )
+  }
+
+  // Multi-faceted detection: check id, type, and name
+  const found = list.find(
+    (c: any) =>
+      c.id === "walletConnect" ||
+      c.type === "walletConnect" ||
+      /wallet.?connect/i.test(c.id) ||
+      /wallet.?connect/i.test(c.name),
+  )
+
+  if (found) {
+    console.log("[v0] WalletConnect connector found in config:", found.id)
+    return found
+  }
+
+  // Fallback: create a new WalletConnect connector on the fly
+  console.warn("[v0] WalletConnect connector not found in config. Creating fallback connector.")
+  return walletConnect({
+    projectId: WC_PROJECT_ID || "___MISSING_PROJECT_ID___",
+    showQrModal: true,
+    metadata: {
+      name: "newnity",
+      description: "USDC crowdfunding platform with FanFi layer",
+      url: "https://newnity.vercel.app",
+      icons: ["https://newnity.vercel.app/icon.png"],
+    },
+  })
+}
+
 export function WalletConnectButton({ className }: { className?: string }) {
   const { address, isConnected, chain } = useAccount()
   const { connectors, error: connectError } = useConnect()
@@ -42,6 +83,7 @@ export function WalletConnectButton({ className }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showChainSwitchDialog, setShowChainSwitchDialog] = useState(false)
   const [targetChainId, setTargetChainId] = useState<number | null>(null)
+  const [enhancedConnectors, setEnhancedConnectors] = useState(connectors)
 
   const connectWith = useConnectWithChainEnforcement()
 
@@ -58,9 +100,11 @@ export function WalletConnectButton({ className }: { className?: string }) {
       (c) => c.id === "walletConnect" || c.name.toLowerCase().includes("walletconnect"),
     )
     if (!hasWalletConnect) {
-      console.warn(
-        "[v0] WalletConnect connector not found. Please check NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID environment variable.",
-      )
+      console.warn("[v0] WalletConnect connector not found in config. Will use fallback when needed.")
+      const fallbackConnector = getWalletConnectConnector()
+      setEnhancedConnectors([...connectors, fallbackConnector as any])
+    } else {
+      setEnhancedConnectors(connectors)
     }
   }, [connectors])
 
@@ -199,12 +243,12 @@ export function WalletConnectButton({ className }: { className?: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[60] mt-4">
-        {connectors.length === 0 ? (
+        {enhancedConnectors.length === 0 ? (
           <DropdownMenuItem disabled className="text-gray-500">
             No wallets available
           </DropdownMenuItem>
         ) : (
-          connectors.map((connector) => (
+          enhancedConnectors.map((connector) => (
             <DropdownMenuItem
               key={connector.id}
               onClick={async () => {
