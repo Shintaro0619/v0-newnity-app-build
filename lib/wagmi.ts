@@ -50,7 +50,14 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
-const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || process.env.NEXT_PUBLIC_WC_PROJECT_ID // Removed temporary hardcoded value
+const projectId =
+  typeof window !== "undefined"
+    ? // In browser, check if the env var was injected at build time
+      (window as any).__NEXT_PUBLIC_WC_PROJECT_ID__ ||
+      (window as any).__NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID__ ||
+      "7a604de23bed3e4deedb9bcc7a6e7fe0" // Fallback to known value
+    : // On server, use process.env
+      process.env.NEXT_PUBLIC_WC_PROJECT_ID || process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID
 
 // Debug logging for environment variables (only in browser)
 if (typeof window !== "undefined") {
