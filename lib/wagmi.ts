@@ -50,40 +50,33 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
-const projectId =
-  typeof window !== "undefined"
-    ? // In browser, check if the env var was injected at build time
-      (window as any).__NEXT_PUBLIC_WC_PROJECT_ID__ ||
-      (window as any).__NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID__ ||
-      "7a604de23bed3e4deedb9bcc7a6e7fe0" // Fallback to known value
-    : // On server, use process.env
-      process.env.NEXT_PUBLIC_WC_PROJECT_ID || process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID ?? ""
+
+const metadata = {
+  name: "newnity",
+  description: "USDC crowdfunding platform with FanFi layer",
+  url: "https://newnity.vercel.app",
+  icons: ["https://newnity.vercel.app/icon.png"],
+}
 
 // Debug logging for environment variables (only in browser)
 if (typeof window !== "undefined") {
-  console.log("[v0] WalletConnect Project ID present:", Boolean(projectId))
-  console.log("[v0] WalletConnect Project ID value:", projectId)
-  console.log("[v0] Environment check:", {
-    hasWalletConnectProjectId: Boolean(process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID),
-    hasWcProjectId: Boolean(process.env.NEXT_PUBLIC_WC_PROJECT_ID),
-  })
+  console.log("[v0] WalletConnect Project ID present:", Boolean(WC_PROJECT_ID))
+  if (WC_PROJECT_ID) {
+    console.log("[v0] WalletConnect Project ID value:", WC_PROJECT_ID)
+  }
 }
 
 export const config = createConfig({
   chains: SUPPORTED_CHAINS,
   connectors: [
     injected(),
-    ...(projectId
+    ...(WC_PROJECT_ID
       ? [
           walletConnect({
-            projectId,
+            projectId: WC_PROJECT_ID,
             showQrModal: true,
-            metadata: {
-              name: "newnity",
-              description: "USDC crowdfunding platform with FanFi layer",
-              url: process.env.NEXT_PUBLIC_APP_URL || "https://newnity.vercel.app",
-              icons: ["https://newnity.vercel.app/icon.png"],
-            },
+            metadata,
           }),
         ]
       : []),
