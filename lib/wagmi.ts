@@ -1,26 +1,6 @@
 "use client"
 
-import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
-import { injected, metaMask, coinbaseWallet, walletConnect } from "wagmi/connectors"
-import { WC_PROJECT_ID } from "@/lib/publicEnv"
-
-if (typeof window !== "undefined") {
-  if (typeof (window as any).process === "undefined") {
-    ;(window as any).process = {
-      env: {},
-      version: "v18.0.0",
-      versions: {},
-      platform: "browser",
-      nextTick: (callback: Function, ...args: any[]) => {
-        setTimeout(() => callback(...args), 0)
-      },
-      emitWarning: function emitWarning(...args: any[]) {
-        return undefined
-      },
-    }
-  }
-}
 
 // Custom Base Sepolia configuration
 const baseSepoliaCustom = {
@@ -68,81 +48,6 @@ export const CONTRACT_ADDRESSES = {
       "0x0000000000000000000000000000000000000000") as `0x${string}`,
   },
 } as const
-
-const metadata = {
-  name: "newnity",
-  description: "USDC crowdfunding platform with FanFi layer",
-  url: "https://newnity.vercel.app",
-  icons: ["https://newnity.vercel.app/icon.png"],
-}
-
-// Enhanced debug logging for environment variables (only in browser)
-if (typeof window !== "undefined") {
-  console.log("[v0] WalletConnect Project ID present:", Boolean(WC_PROJECT_ID))
-  console.log("[v0] WalletConnect Project ID length:", WC_PROJECT_ID.length)
-  if (WC_PROJECT_ID) {
-    console.log("[v0] WalletConnect Project ID value:", WC_PROJECT_ID)
-  } else {
-    console.warn("[v0] NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is not set")
-  }
-}
-
-function createConnectors() {
-  const connectors = [
-    injected({ shimDisconnect: true }),
-    metaMask({ shimDisconnect: true }),
-    coinbaseWallet({
-      appName: "newnity",
-      preference: "eoaOnly",
-    }),
-  ]
-
-  if (WC_PROJECT_ID) {
-    try {
-      const wcConnector = walletConnect({
-        projectId: WC_PROJECT_ID,
-        showQrModal: true,
-        metadata,
-      })
-      connectors.push(wcConnector)
-      console.log("[v0] WalletConnect connector initialized successfully")
-    } catch (error) {
-      console.error("[v0] Failed to initialize WalletConnect connector:", error)
-      console.warn("[v0] WalletConnect will be available via fallback in wallet-connect-button.tsx")
-    }
-  } else {
-    console.warn("[v0] WC_PROJECT_ID is missing, WalletConnect connector not initialized")
-  }
-
-  if (typeof window !== "undefined") {
-    console.log(
-      "[v0] Created connectors:",
-      connectors.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
-    )
-  }
-
-  return connectors
-}
-
-if (typeof window !== "undefined") {
-  console.log("[v0] Creating Wagmi config with WC_PROJECT_ID:", Boolean(WC_PROJECT_ID))
-}
-
-export const config = createConfig({
-  chains: SUPPORTED_CHAINS,
-  connectors: createConnectors(),
-  transports: {
-    [baseSepoliaCustom.id]: http(),
-    [baseMainnetCustom.id]: http(),
-  },
-})
-
-if (typeof window !== "undefined") {
-  console.log(
-    "[v0] Final config connectors:",
-    config.connectors.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
-  )
-}
 
 export function getContractAddress(chainId: number, contract: "MOCK_USDC" | "ESCROW_VAULT"): `0x${string}` {
   const addresses = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]

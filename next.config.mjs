@@ -10,7 +10,6 @@ const nextConfig = {
     unoptimized: true,
   },
   webpack: (config, { isServer }) => {
-    // Handle node modules that need to be externalized or polyfilled
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
@@ -25,12 +24,22 @@ const nextConfig = {
         path: false,
         os: false,
       };
+
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        '@react-native-async-storage/async-storage': false,
+        '@metamask/sdk': false,
+        '@metamask/sdk-react': false,
+        '@metamask/sdk-react-ui': false,
+        'eventemitter2': false,
+        'eventemitter3': false,
+      };
     }
 
-    // Ignore specific warnings from WalletConnect
     config.ignoreWarnings = [
       { module: /node_modules\/@walletconnect/ },
-      { module: /node_modules\/eventemitter3/ },
+      { module: /node_modules\/eventemitter/ },
+      { module: /node_modules\/@metamask/ },
     ];
 
     return config;

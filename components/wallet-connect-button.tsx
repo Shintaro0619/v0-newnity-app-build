@@ -6,8 +6,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { SUPPORTED_CHAINS, getChainName, isChainSupported, config } from "@/lib/wagmi"
-import { walletConnect } from "wagmi/connectors"
+import { SUPPORTED_CHAINS, getChainName, isChainSupported } from "@/lib/wagmi"
 import { WC_PROJECT_ID } from "@/lib/publicEnv"
 import {
   AlertDialog,
@@ -34,45 +33,6 @@ function setGlobalConnecting(isConnecting: boolean) {
   connectingListeners.forEach((listener) => listener(isConnecting))
 }
 
-function getWalletConnectConnector() {
-  const list = config.connectors
-
-  // Log all connectors for debugging
-  if (typeof window !== "undefined") {
-    console.log(
-      "[v0] Connectors detail:",
-      list.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
-    )
-  }
-
-  // Multi-faceted detection: check id, type, and name
-  const found = list.find(
-    (c: any) =>
-      c.id === "walletConnect" ||
-      c.type === "walletConnect" ||
-      /wallet.?connect/i.test(c.id) ||
-      /wallet.?connect/i.test(c.name),
-  )
-
-  if (found) {
-    console.log("[v0] WalletConnect connector found in config:", found.id)
-    return found
-  }
-
-  // Fallback: create a new WalletConnect connector on the fly
-  console.warn("[v0] WalletConnect connector not found in config. Creating fallback connector.")
-  return walletConnect({
-    projectId: WC_PROJECT_ID || "___MISSING_PROJECT_ID___",
-    showQrModal: true,
-    metadata: {
-      name: "newnity",
-      description: "USDC crowdfunding platform with FanFi layer",
-      url: "https://newnity.vercel.app",
-      icons: ["https://newnity.vercel.app/icon.png"],
-    },
-  })
-}
-
 export function WalletConnectButton({ className }: { className?: string }) {
   const { address, isConnected, chain } = useAccount()
   const { connectors, error: connectError } = useConnect()
@@ -83,7 +43,8 @@ export function WalletConnectButton({ className }: { className?: string }) {
   const [isOpen, setIsOpen] = useState(false)
   const [showChainSwitchDialog, setShowChainSwitchDialog] = useState(false)
   const [targetChainId, setTargetChainId] = useState<number | null>(null)
-  const [enhancedConnectors, setEnhancedConnectors] = useState(connectors)
+  const [wcConnector, setWcConnector] = useState<any>(null)
+  const [isLoadingWC, setIsLoadingWC] = useState(false)
 
   const connectWith = useConnectWithChainEnforcement()
 
@@ -96,16 +57,6 @@ export function WalletConnectButton({ className }: { className?: string }) {
       "[v0] Available wallet connectors:",
       connectors.map((c) => ({ id: c.id, name: c.name, type: c.type })),
     )
-    const hasWalletConnect = connectors.some(
-      (c) => c.id === "walletConnect" || c.name.toLowerCase().includes("walletconnect"),
-    )
-    if (!hasWalletConnect) {
-      console.warn("[v0] WalletConnect connector not found in config. Will use fallback when needed.")
-      const fallbackConnector = getWalletConnectConnector()
-      setEnhancedConnectors([...connectors, fallbackConnector as any])
-    } else {
-      setEnhancedConnectors(connectors)
-    }
   }, [connectors])
 
   useEffect(() => {
@@ -179,6 +130,45 @@ export function WalletConnectButton({ className }: { className?: string }) {
     })
   }
 
+  const loadWalletConnect = async () => {
+    if (wcConnector || isLoadingWC) return wcConnector
+
+    setIsLoadingWC(true)
+    try {
+      console.log("[v0] Loading WalletConnect connector dynamically...")
+      const { walletConnect } = await import("wagmi/connectors")
+
+      const connector = walletConnect({
+        projectId: WC_PROJECT_ID || "7a604de23bed3e4deedb9bcc7a6e7fe0",
+        showQrModal: true,
+        metadata: {
+          name: "newnity",
+          description: "USDC crowdfunding on newnity",
+          url: typeof window !== "undefined" ? window.location.origin : "https://newnity.vercel.app",
+          icons: [
+            typeof window !== "undefined"
+              ? `${window.location.origin}/icon-512.png`
+              : "https://newnity.vercel.app/icon-512.png",
+          ],
+        },
+      })
+
+      setWcConnector(connector)
+      console.log("[v0] WalletConnect connector loaded successfully")
+      return connector
+    } catch (error) {
+      console.error("[v0] Failed to load WalletConnect:", error)
+      toast({
+        title: "WalletConnect Unavailable",
+        description: "Failed to load WalletConnect. Please try using a browser extension wallet.",
+        variant: "destructive",
+      })
+      return null
+    } finally {
+      setIsLoadingWC(false)
+    }
+  }
+
   if (isConnected && address) {
     return (
       <>
@@ -237,19 +227,16 @@ export function WalletConnectButton({ className }: { className?: string }) {
           size="sm"
           className={cn(
             "text-gray-300 border-gray-700 bg-transparent",
-            "hover:bg-green-600 hover:text-white hover:border-green-600",
+            "hover:bg-green-600/20 hover:text-green-500 hover:border-green-600",
             "transition-all duration-200",
             "cursor-pointer",
-            "relative z-[101]", // Added z-index to ensure button is on top
+            "relative z-[101]",
             className,
           )}
           disabled={isConnecting}
           onClick={(e) => {
-            console.log("[v0] Connect Wallet button clicked - event:", e)
-            console.log("[v0] Button element:", e.currentTarget)
-            console.log("[v0] isOpen before:", isOpen)
+            console.log("[v0] Connect Wallet button clicked")
             setIsOpen(true)
-            console.log("[v0] setIsOpen(true) called")
           }}
         >
           <span className="mr-2">👛</span>
@@ -257,23 +244,55 @@ export function WalletConnectButton({ className }: { className?: string }) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[9999] mt-4">
-        {enhancedConnectors.length === 0 ? (
+        {connectors.length === 0 ? (
           <DropdownMenuItem disabled className="text-gray-500">
             No wallets available
           </DropdownMenuItem>
         ) : (
-          enhancedConnectors.map((connector) => (
+          <>
+            {connectors.map((connector) => (
+              <DropdownMenuItem
+                key={connector.id}
+                onClick={async () => {
+                  console.log("[v0] Connecting to wallet:", connector.name)
+                  setIsOpen(false)
+                  setIsConnecting(true)
+                  try {
+                    await connectWith(connector)
+                    console.log("[v0] Connect function completed for:", connector.name)
+                  } catch (error) {
+                    console.error("[v0] Error during wallet connection:", error)
+                    setIsConnecting(false)
+                    if (error instanceof Error && !error.message.includes("rejected")) {
+                      toast({
+                        title: "Connection Failed",
+                        description: error.message || "Failed to connect wallet",
+                        variant: "destructive",
+                      })
+                    }
+                  }
+                }}
+                className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
+                disabled={isConnecting}
+              >
+                {connector.name}
+              </DropdownMenuItem>
+            ))}
             <DropdownMenuItem
-              key={connector.id}
               onClick={async () => {
-                console.log("[v0] Connecting to wallet:", connector.name)
+                console.log("[v0] Loading WalletConnect...")
                 setIsOpen(false)
                 setIsConnecting(true)
                 try {
-                  await connectWith(connector)
-                  console.log("[v0] Connect function completed for:", connector.name)
+                  const connector = await loadWalletConnect()
+                  if (connector) {
+                    await connectWith(connector)
+                    console.log("[v0] WalletConnect connection completed")
+                  } else {
+                    setIsConnecting(false)
+                  }
                 } catch (error) {
-                  console.error("[v0] Error during wallet connection:", error)
+                  console.error("[v0] Error during WalletConnect connection:", error)
                   setIsConnecting(false)
                   if (error instanceof Error && !error.message.includes("rejected")) {
                     toast({
@@ -285,11 +304,11 @@ export function WalletConnectButton({ className }: { className?: string }) {
                 }
               }}
               className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
-              disabled={isConnecting}
+              disabled={isConnecting || isLoadingWC}
             >
-              {connector.name}
+              {isLoadingWC ? "Loading WalletConnect..." : "WalletConnect"}
             </DropdownMenuItem>
-          ))
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
