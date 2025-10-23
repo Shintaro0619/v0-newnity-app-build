@@ -1,6 +1,6 @@
 import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
-import { injected } from "wagmi/connectors"
+import { injected, walletConnect } from "wagmi/connectors"
 
 if (typeof window !== "undefined") {
   if (typeof (window as any).process === "undefined") {
@@ -52,7 +52,19 @@ export const SUPPORTED_CHAINS = [
 
 export const config = createConfig({
   chains: SUPPORTED_CHAINS,
-  connectors: [injected()],
+  connectors: [
+    injected(),
+    walletConnect({
+      projectId: process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || "",
+      showQrModal: true,
+      metadata: {
+        name: "newnity",
+        description: "USDC crowdfunding platform with FanFi layer",
+        url: process.env.NEXT_PUBLIC_APP_URL || "https://newnity.vercel.app",
+        icons: ["https://newnity.vercel.app/icon.png"],
+      },
+    }),
+  ],
   transports: {
     [baseSepoliaCustom.id]: http(),
     [baseMainnetCustom.id]: http(),
