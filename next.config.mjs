@@ -31,14 +31,11 @@ const nextConfig = {
         '@metamask/sdk': false,
         '@metamask/sdk-react': false,
         '@metamask/sdk-react-ui': false,
-        'eventemitter2': false,
-        'eventemitter3': false,
       };
     }
 
     config.ignoreWarnings = [
       { module: /node_modules\/@walletconnect/ },
-      { module: /node_modules\/eventemitter/ },
       { module: /node_modules\/@metamask/ },
     ];
 
