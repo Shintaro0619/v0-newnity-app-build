@@ -1,6 +1,6 @@
 import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
-import { injected, walletConnect } from "wagmi/connectors"
+import { injected, metaMask, coinbaseWallet, walletConnect } from "wagmi/connectors"
 
 if (typeof window !== "undefined") {
   if (typeof (window as any).process === "undefined") {
@@ -50,7 +50,7 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
-const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID ?? ""
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || ""
 
 const metadata = {
   name: "newnity",
@@ -59,18 +59,25 @@ const metadata = {
   icons: ["https://newnity.vercel.app/icon.png"],
 }
 
-// Debug logging for environment variables (only in browser)
+// Enhanced debug logging for environment variables (only in browser)
 if (typeof window !== "undefined") {
   console.log("[v0] WalletConnect Project ID present:", Boolean(WC_PROJECT_ID))
   if (WC_PROJECT_ID) {
     console.log("[v0] WalletConnect Project ID value:", WC_PROJECT_ID)
+  } else {
+    console.warn("[v0] NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID is not set")
   }
 }
 
 export const config = createConfig({
   chains: SUPPORTED_CHAINS,
   connectors: [
-    injected(),
+    injected({ shimDisconnect: true }),
+    metaMask({ shimDisconnect: true }),
+    coinbaseWallet({
+      appName: "newnity",
+      preference: "eoaOnly",
+    }),
     ...(WC_PROJECT_ID
       ? [
           walletConnect({
