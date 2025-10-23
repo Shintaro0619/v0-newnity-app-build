@@ -38,6 +38,8 @@ export function Navbar() {
 
   useEffect(() => {
     console.log("[v0] [NAVBAR] Wallet connection state:", { isConnected, address })
+    console.log("[v0] [NAVBAR] Will render AuthButton:", isConnected && !!address)
+    console.log("[v0] [NAVBAR] Will render WalletConnectButton:", !isConnected)
   }, [isConnected, address])
 
   const handleSearch = (e: React.FormEvent) => {
@@ -131,9 +133,17 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          {isConnected && address && <AuthButton />}
-
-          {!isConnected && <WalletConnectButton />}
+          {isConnected && address ? (
+            <>
+              {console.log("[v0] [NAVBAR] Rendering AuthButton")}
+              <AuthButton />
+            </>
+          ) : (
+            <>
+              {console.log("[v0] [NAVBAR] Rendering WalletConnectButton")}
+              <WalletConnectButton />
+            </>
+          )}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>

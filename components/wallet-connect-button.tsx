@@ -61,6 +61,10 @@ export function WalletConnectButton({ className }: { className?: string }) {
     }
   }, [isConnected, chain])
 
+  useEffect(() => {
+    console.log("[v0] [WALLET_BUTTON] Component state:", { isConnected, address, status })
+  }, [isConnected, address, status])
+
   const handleChainSwitch = async () => {
     if (!targetChainId) return
 
@@ -95,6 +99,7 @@ export function WalletConnectButton({ className }: { className?: string }) {
   }
 
   if (isConnected && address) {
+    console.log("[v0] [WALLET_BUTTON] Rendering chain switch dialog only")
     return (
       <AlertDialog open={showChainSwitchDialog} onOpenChange={setShowChainSwitchDialog}>
         <AlertDialogContent>
@@ -124,6 +129,7 @@ export function WalletConnectButton({ className }: { className?: string }) {
     )
   }
 
+  console.log("[v0] [WALLET_BUTTON] Rendering Connect Wallet button")
   return (
     <>
       <Button
