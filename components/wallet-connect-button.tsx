@@ -1,11 +1,12 @@
 "use client"
 
-import type React from "react"
+import { useEffect } from "react"
+
+import { useState } from "react"
 
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import { Button } from "@/components/ui/button"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useEffect, useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
 import { SUPPORTED_CHAINS, getChainName, isChainSupported } from "@/lib/wagmi"
@@ -19,86 +20,38 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { useConnectWithChainEnforcement } from "@/hooks/use-connect-with-chain-enforcement"
 
-let globalIsConnecting = false
-const connectingListeners = new Set<(isConnecting: boolean) => void>()
+type ConnectingListener = (isConnecting: boolean) => void
+const connectingListeners = new Set<ConnectingListener>()
+let currentConnectingState = false
 
-export function subscribeToConnecting(listener: (isConnecting: boolean) => void) {
+export function subscribeToConnecting(listener: ConnectingListener) {
   connectingListeners.add(listener)
-  return () => connectingListeners.delete(listener)
+  listener(currentConnectingState)
+  return () => {
+    connectingListeners.delete(listener)
+  }
 }
 
-function setGlobalConnecting(isConnecting: boolean) {
-  globalIsConnecting = isConnecting
+function notifyConnectingListeners(isConnecting: boolean) {
+  currentConnectingState = isConnecting
   connectingListeners.forEach((listener) => listener(isConnecting))
 }
 
 export function WalletConnectButton({ className }: { className?: string }) {
   const { address, isConnected, chain } = useAccount()
-  const { connectors, error: connectError } = useConnect()
+  const { connectors, connectAsync, status } = useConnect()
   const { disconnect } = useDisconnect()
   const { switchChain } = useSwitchChain()
   const { toast } = useToast()
-  const [isConnecting, setIsConnecting] = useState(false)
-  const [isOpen, setIsOpen] = useState(false)
+
+  const [open, setOpen] = useState(false)
   const [showChainSwitchDialog, setShowChainSwitchDialog] = useState(false)
   const [targetChainId, setTargetChainId] = useState<number | null>(null)
 
-  const connectWith = useConnectWithChainEnforcement()
-
   useEffect(() => {
-    console.log("[v0] WalletConnectButton component mounted")
-    console.log("[v0] Initial state:", { isConnected, address: address || "none", isConnecting })
-    return () => {
-      console.log("[v0] WalletConnectButton component unmounted")
-    }
-  }, [])
-
-  useEffect(() => {
-    setGlobalConnecting(isConnecting)
-  }, [isConnecting])
-
-  useEffect(() => {
-    console.log(
-      "[v0] Available wallet connectors:",
-      connectors.map((c) => ({ id: c.id, name: c.name, type: c.type })),
-    )
-  }, [connectors])
-
-  useEffect(() => {
-    console.log("[v0] Wallet connection state:", {
-      isConnected,
-      address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "none",
-    })
-  }, [isConnected, address])
-
-  useEffect(() => {
-    console.log("[v0] Dropdown menu state changed:", { isOpen })
-  }, [isOpen])
-
-  useEffect(() => {
-    if (connectError) {
-      console.error("[v0] Wallet connection error:", connectError)
-      toast({
-        title: "Connection Failed",
-        description: connectError.message || "Failed to connect wallet",
-        variant: "destructive",
-      })
-      setIsConnecting(false)
-    }
-  }, [connectError, toast])
-
-  useEffect(() => {
-    if (isConnected && isConnecting) {
-      console.log("[v0] Wallet connected successfully:", address)
-      toast({
-        title: "Wallet Connected",
-        description: `Connected to ${address?.slice(0, 6)}...${address?.slice(-4)}`,
-      })
-      setIsConnecting(false)
-    }
-  }, [isConnected, isConnecting, address, toast])
+    notifyConnectingListeners(status === "pending")
+  }, [status])
 
   useEffect(() => {
     if (isConnected && chain && !isChainSupported(chain.id)) {
@@ -141,24 +94,6 @@ export function WalletConnectButton({ className }: { className?: string }) {
     })
   }
 
-  const handleButtonClick = (e: React.MouseEvent) => {
-    console.log("[v0] Connect Wallet button clicked - event details:", {
-      type: e.type,
-      target: e.target,
-      currentTarget: e.currentTarget,
-      isConnecting,
-      isOpen,
-    })
-
-    if (isConnecting) {
-      console.log("[v0] Button click ignored - already connecting")
-      return
-    }
-
-    console.log("[v0] Opening dropdown menu")
-    setIsOpen(true)
-  }
-
   if (isConnected && address) {
     return (
       <>
@@ -175,7 +110,6 @@ export function WalletConnectButton({ className }: { className?: string }) {
             size="sm"
             className="text-gray-300 border-gray-700 hover:bg-gray-900"
           >
-            <span className="mr-2">🚪</span>
             Disconnect
           </Button>
         </div>
@@ -210,53 +144,40 @@ export function WalletConnectButton({ className }: { className?: string }) {
   }
 
   return (
-    <DropdownMenu
-      open={isOpen}
-      onOpenChange={(open) => {
-        console.log("[v0] Dropdown onOpenChange called:", open)
-        setIsOpen(open)
-      }}
-    >
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className={cn(
-            "text-gray-300 border-gray-700 bg-transparent",
-            "hover:bg-green-600/20 hover:text-green-500 hover:border-green-600",
-            "transition-all duration-200",
-            "cursor-pointer",
-            "relative z-[101]",
-            className,
-          )}
-          disabled={isConnecting}
-          onClick={handleButtonClick}
-        >
-          <span className="mr-2">👛</span>
-          {isConnecting ? "Connecting..." : "Connect Wallet"}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[9999]">
-        {connectors.length === 0 ? (
-          <DropdownMenuItem disabled className="text-gray-500">
-            No wallets available
-          </DropdownMenuItem>
-        ) : (
-          <>
+    <>
+      <Button
+        onClick={() => {
+          console.log("[v0] Connect Wallet button clicked")
+          setOpen(true)
+        }}
+        className={cn("transition-colors hover:bg-green-600", className)}
+        disabled={status === "pending"}
+      >
+        {status === "pending" ? "Connecting..." : "Connect Wallet"}
+      </Button>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select a wallet</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid gap-2">
             {connectors.map((connector) => (
-              <DropdownMenuItem
+              <Button
                 key={connector.id}
+                variant="outline"
                 onClick={async () => {
-                  console.log("[v0] Wallet connector selected:", connector.name, connector.id)
-                  setIsOpen(false)
-                  setIsConnecting(true)
+                  console.log("[v0] Wallet connector selected:", connector.name)
                   try {
-                    console.log("[v0] Calling connectWith for:", connector.name)
-                    await connectWith(connector)
-                    console.log("[v0] Connect function completed for:", connector.name)
+                    await connectAsync({ connector })
+                    setOpen(false)
+                    toast({
+                      title: "Wallet Connected",
+                      description: `Connected with ${connector.name}`,
+                    })
                   } catch (error) {
-                    console.error("[v0] Error during wallet connection:", error)
-                    setIsConnecting(false)
+                    console.error("[v0] Connection error:", error)
                     if (error instanceof Error && !error.message.includes("rejected")) {
                       toast({
                         title: "Connection Failed",
@@ -266,15 +187,17 @@ export function WalletConnectButton({ className }: { className?: string }) {
                     }
                   }
                 }}
-                className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
-                disabled={isConnecting}
+                className="justify-start"
+                disabled={status === "pending"}
               >
                 {connector.name}
-              </DropdownMenuItem>
+              </Button>
             ))}
-          </>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          </div>
+
+          <p className="text-xs text-muted-foreground mt-2">Status: {status}</p>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }
