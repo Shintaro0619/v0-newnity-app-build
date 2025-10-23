@@ -1,6 +1,7 @@
 import { ProfilePageClient } from "./profile-page-client"
 import { getCampaignsByCreator } from "@/lib/actions/campaigns"
 import { sql } from "@/lib/db"
+import RequireWallet from "@/components/guards/require-wallet"
 
 interface PageProps {
   params: Promise<{ address: string }>
@@ -42,5 +43,9 @@ export default async function ProfilePage({ params }: PageProps) {
 
   const [userProfile, campaigns] = await Promise.all([getUserProfile(address), getCampaignsByCreator(address)])
 
-  return <ProfilePageClient userProfile={userProfile} campaigns={campaigns} address={address} />
+  return (
+    <RequireWallet>
+      <ProfilePageClient userProfile={userProfile} campaigns={campaigns} address={address} />
+    </RequireWallet>
+  )
 }

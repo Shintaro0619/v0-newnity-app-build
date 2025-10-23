@@ -80,7 +80,7 @@ export function ProfilePageClient({ userProfile, campaigns, address }: ProfilePa
           <CardContent className="pt-6">
             <div className="flex flex-col md:flex-row items-center md:items-start gap-6">
               <Avatar className="h-24 w-24 flex-shrink-0">
-                <AvatarImage src={userProfile.avatar || "/placeholder.svg"} alt={userProfile.name} />
+                <AvatarImage src={userProfile.avatar || undefined} alt={userProfile.name} />
                 <AvatarFallback className="text-2xl">
                   {userProfile.name?.charAt(0) || userProfile.email?.charAt(0) || "U"}
                 </AvatarFallback>

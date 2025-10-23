@@ -1,10 +1,23 @@
 "use client"
 
-import { useAccount, useConnect, useDisconnect } from "wagmi"
+import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useEffect, useState } from "react"
 import { useToast } from "@/hooks/use-toast"
+import { cn } from "@/lib/utils"
+import { SUPPORTED_CHAINS, getChainName, isChainSupported } from "@/lib/wagmi"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { useConnectWithChainEnforcement } from "@/hooks/use-connect-with-chain-enforcement"
 
 let globalIsConnecting = false
 const connectingListeners = new Set<(isConnecting: boolean) => void>()
@@ -19,13 +32,18 @@ function setGlobalConnecting(isConnecting: boolean) {
   connectingListeners.forEach((listener) => listener(isConnecting))
 }
 
-export function WalletConnectButton() {
-  const { address, isConnected } = useAccount()
-  const { connect, connectors, error: connectError } = useConnect()
+export function WalletConnectButton({ className }: { className?: string }) {
+  const { address, isConnected, chain } = useAccount()
+  const { connectors, error: connectError } = useConnect()
   const { disconnect } = useDisconnect()
+  const { switchChain } = useSwitchChain()
   const { toast } = useToast()
   const [isConnecting, setIsConnecting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [showChainSwitchDialog, setShowChainSwitchDialog] = useState(false)
+  const [targetChainId, setTargetChainId] = useState<number | null>(null)
+
+  const connectWith = useConnectWithChainEnforcement()
 
   useEffect(() => {
     setGlobalConnecting(isConnecting)
@@ -68,25 +86,94 @@ export function WalletConnectButton() {
     }
   }, [isConnected, isConnecting, address, toast])
 
+  useEffect(() => {
+    if (isConnected && chain && !isChainSupported(chain.id)) {
+      console.log("[v0] Unsupported chain detected:", chain.id, chain.name)
+      setTargetChainId(SUPPORTED_CHAINS[0].id)
+      setShowChainSwitchDialog(true)
+    }
+  }, [isConnected, chain])
+
+  const handleChainSwitch = async () => {
+    if (!targetChainId) return
+
+    try {
+      console.log("[v0] Switching to chain:", targetChainId, getChainName(targetChainId))
+      await switchChain({ chainId: targetChainId })
+      toast({
+        title: "Network Switched",
+        description: `Switched to ${getChainName(targetChainId)}`,
+      })
+      setShowChainSwitchDialog(false)
+      setTargetChainId(null)
+    } catch (error) {
+      console.error("[v0] Chain switch failed:", error)
+      toast({
+        title: "Switch Failed",
+        description: error instanceof Error ? error.message : "Failed to switch network",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleChainSwitchCancel = () => {
+    setShowChainSwitchDialog(false)
+    setTargetChainId(null)
+    disconnect()
+    toast({
+      title: "Disconnected",
+      description: "Wallet disconnected due to unsupported network",
+      variant: "destructive",
+    })
+  }
+
   if (isConnected && address) {
     return (
-      <div className="flex items-center gap-2">
-        <div className="text-sm text-gray-400">
-          {address.slice(0, 6)}...{address.slice(-4)}
+      <>
+        <div className="flex items-center gap-2">
+          <div className="text-sm text-gray-400">
+            {address.slice(0, 6)}...{address.slice(-4)}
+          </div>
+          <Button
+            onClick={() => {
+              console.log("[v0] Disconnecting wallet")
+              disconnect()
+            }}
+            variant="outline"
+            size="sm"
+            className="text-gray-300 border-gray-700 hover:bg-gray-900"
+          >
+            <span className="mr-2">🚪</span>
+            Disconnect
+          </Button>
         </div>
-        <Button
-          onClick={() => {
-            console.log("[v0] Disconnecting wallet")
-            disconnect()
-          }}
-          variant="outline"
-          size="sm"
-          className="text-gray-300 border-gray-700 hover:bg-gray-900"
-        >
-          <span className="mr-2">🚪</span>
-          Disconnect
-        </Button>
-      </div>
+
+        <AlertDialog open={showChainSwitchDialog} onOpenChange={setShowChainSwitchDialog}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Unsupported Network</AlertDialogTitle>
+              <AlertDialogDescription>
+                You are currently connected to <strong>{chain?.name || "an unsupported network"}</strong>.
+                <br />
+                <br />
+                This app only supports the following networks:
+                <ul className="list-disc list-inside mt-2">
+                  {SUPPORTED_CHAINS.map((supportedChain) => (
+                    <li key={supportedChain.id}>{supportedChain.name}</li>
+                  ))}
+                </ul>
+                <br />
+                Would you like to switch to{" "}
+                <strong>{targetChainId ? getChainName(targetChainId) : "a supported network"}</strong>?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={handleChainSwitchCancel}>Cancel & Disconnect</AlertDialogCancel>
+              <AlertDialogAction onClick={handleChainSwitch}>Switch Network</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     )
   }
 
@@ -96,7 +183,7 @@ export function WalletConnectButton() {
         <Button
           variant="outline"
           size="sm"
-          className="text-gray-300 border-gray-700 hover:bg-gray-900 bg-transparent"
+          className={cn("text-gray-300 border-gray-700 bg-transparent", className)}
           disabled={isConnecting}
         >
           <span className="mr-2">👛</span>
@@ -117,16 +204,18 @@ export function WalletConnectButton() {
                 setIsOpen(false)
                 setIsConnecting(true)
                 try {
-                  await connect({ connector })
+                  await connectWith(connector)
                   console.log("[v0] Connect function completed for:", connector.name)
                 } catch (error) {
                   console.error("[v0] Error during wallet connection:", error)
                   setIsConnecting(false)
-                  toast({
-                    title: "Connection Failed",
-                    description: error instanceof Error ? error.message : "Failed to connect wallet",
-                    variant: "destructive",
-                  })
+                  if (error instanceof Error && !error.message.includes("rejected")) {
+                    toast({
+                      title: "Connection Failed",
+                      description: error.message || "Failed to connect wallet",
+                      variant: "destructive",
+                    })
+                  }
                 }
               }}
               className="text-gray-300 hover:bg-gray-800 hover:text-white cursor-pointer"
