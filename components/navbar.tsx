@@ -49,9 +49,7 @@ export function Navbar() {
 
   return (
     <nav
-      className={`fixed top-0 z-50 w-full border-b border-primary/20 bg-black/80 backdrop-blur-nav supports-[backdrop-filter]:bg-black/60 ${
-        isWalletConnecting ? "pointer-events-none" : ""
-      }`}
+      className={`fixed top-0 z-50 w-full border-b border-primary/20 bg-black/80 backdrop-blur-nav supports-[backdrop-filter]:bg-black/60`}
     >
       <div className="container flex h-16 items-center justify-between">
         <Link href="/" className="flex items-center space-x-2">
@@ -117,7 +115,7 @@ export function Navbar() {
           </Link>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex items-center space-x-3 relative z-[100]">
           <Button
             variant="ghost"
             size="sm"

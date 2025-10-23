@@ -240,12 +240,16 @@ export function WalletConnectButton({ className }: { className?: string }) {
             "hover:bg-green-600 hover:text-white hover:border-green-600",
             "transition-all duration-200",
             "cursor-pointer",
+            "relative z-[101]", // Added z-index to ensure button is on top
             className,
           )}
           disabled={isConnecting}
-          onClick={() => {
-            console.log("[v0] Connect Wallet button clicked")
+          onClick={(e) => {
+            console.log("[v0] Connect Wallet button clicked - event:", e)
+            console.log("[v0] Button element:", e.currentTarget)
+            console.log("[v0] isOpen before:", isOpen)
             setIsOpen(true)
+            console.log("[v0] setIsOpen(true) called")
           }}
         >
           <span className="mr-2">👛</span>
