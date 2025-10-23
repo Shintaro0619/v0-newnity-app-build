@@ -1,6 +1,9 @@
+"use client"
+
 import { http, createConfig } from "wagmi"
 import { baseSepolia, base } from "wagmi/chains"
 import { injected, metaMask, coinbaseWallet, walletConnect } from "wagmi/connectors"
+import { WC_PROJECT_ID } from "@/lib/publicEnv"
 
 if (typeof window !== "undefined") {
   if (typeof (window as any).process === "undefined") {
@@ -50,8 +53,6 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
-const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || ""
-
 const metadata = {
   name: "newnity",
   description: "USDC crowdfunding platform with FanFi layer",
@@ -62,6 +63,7 @@ const metadata = {
 // Enhanced debug logging for environment variables (only in browser)
 if (typeof window !== "undefined") {
   console.log("[v0] WalletConnect Project ID present:", Boolean(WC_PROJECT_ID))
+  console.log("[v0] WalletConnect Project ID length:", WC_PROJECT_ID.length)
   if (WC_PROJECT_ID) {
     console.log("[v0] WalletConnect Project ID value:", WC_PROJECT_ID)
   } else {
@@ -78,21 +80,16 @@ export const config = createConfig({
       appName: "newnity",
       preference: "eoaOnly",
     }),
-    ...(WC_PROJECT_ID
-      ? [
-          walletConnect({
-            projectId: WC_PROJECT_ID,
-            showQrModal: true,
-            metadata,
-          }),
-        ]
-      : []),
+    walletConnect({
+      projectId: WC_PROJECT_ID || "___MISSING_PROJECT_ID___",
+      showQrModal: true,
+      metadata,
+    }),
   ],
   transports: {
     [baseSepoliaCustom.id]: http(),
     [baseMainnetCustom.id]: http(),
   },
-  ssr: true,
 })
 
 export const CONTRACT_ADDRESSES = {

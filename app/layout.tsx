@@ -39,6 +39,8 @@ export default function RootLayout({
             __html: `
               (function() {
                 if (typeof window !== 'undefined') {
+                  console.log('[v0] Layout script loaded');
+                  
                   // Polyfill process object
                   if (typeof window.process === 'undefined') {
                     window.process = {
