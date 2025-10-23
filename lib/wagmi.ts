@@ -53,6 +53,22 @@ export const SUPPORTED_CHAINS = [
   baseMainnetCustom, // Primary mainnet
 ] as const
 
+export const CONTRACT_ADDRESSES = {
+  // Base Sepolia (testnet)
+  [baseSepolia.id]: {
+    MOCK_USDC: (process.env.NEXT_PUBLIC_MOCK_USDC_BASE_SEPOLIA ||
+      "0xC08b4C06eBd87DF46c28B620E71463bd7567F9bB") as `0x${string}`,
+    ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE_SEPOLIA ||
+      "0x6C52550E28152404c03f36089f9f652304C2AB51") as `0x${string}`,
+  },
+  // Base Mainnet
+  [base.id]: {
+    MOCK_USDC: (process.env.NEXT_PUBLIC_USDC_BASE || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`,
+    ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE ||
+      "0x0000000000000000000000000000000000000000") as `0x${string}`,
+  },
+} as const
+
 const metadata = {
   name: "newnity",
   description: "USDC crowdfunding platform with FanFi layer",
@@ -98,7 +114,18 @@ function createConnectors() {
     console.warn("[v0] WC_PROJECT_ID is missing, WalletConnect connector not initialized")
   }
 
+  if (typeof window !== "undefined") {
+    console.log(
+      "[v0] Created connectors:",
+      connectors.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
+    )
+  }
+
   return connectors
+}
+
+if (typeof window !== "undefined") {
+  console.log("[v0] Creating Wagmi config with WC_PROJECT_ID:", Boolean(WC_PROJECT_ID))
 }
 
 export const config = createConfig({
@@ -110,21 +137,12 @@ export const config = createConfig({
   },
 })
 
-export const CONTRACT_ADDRESSES = {
-  // Base Sepolia (testnet)
-  [baseSepolia.id]: {
-    MOCK_USDC: (process.env.NEXT_PUBLIC_MOCK_USDC_BASE_SEPOLIA ||
-      "0xC08b4C06eBd87DF46c28B620E71463bd7567F9bB") as `0x${string}`, // Deployed Mock USDC
-    ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE_SEPOLIA ||
-      "0x6C52550E28152404c03f36089f9f652304C2AB51") as `0x${string}`, // Deployed Escrow contract
-  },
-  // Base Mainnet
-  [base.id]: {
-    MOCK_USDC: (process.env.NEXT_PUBLIC_USDC_BASE || "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913") as `0x${string}`,
-    ESCROW_VAULT: (process.env.NEXT_PUBLIC_ESCROW_VAULT_BASE ||
-      "0x0000000000000000000000000000000000000000") as `0x${string}`,
-  },
-} as const
+if (typeof window !== "undefined") {
+  console.log(
+    "[v0] Final config connectors:",
+    config.connectors.map((c: any) => ({ id: c.id, name: c.name, type: c.type })),
+  )
+}
 
 export function getContractAddress(chainId: number, contract: "MOCK_USDC" | "ESCROW_VAULT"): `0x${string}` {
   const addresses = CONTRACT_ADDRESSES[chainId as keyof typeof CONTRACT_ADDRESSES]
