@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useAccount, useConnect, useDisconnect, useSwitchChain } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -46,6 +48,14 @@ export function WalletConnectButton({ className }: { className?: string }) {
   const connectWith = useConnectWithChainEnforcement()
 
   useEffect(() => {
+    console.log("[v0] WalletConnectButton component mounted")
+    console.log("[v0] Initial state:", { isConnected, address: address || "none", isConnecting })
+    return () => {
+      console.log("[v0] WalletConnectButton component unmounted")
+    }
+  }, [])
+
+  useEffect(() => {
     setGlobalConnecting(isConnecting)
   }, [isConnecting])
 
@@ -62,6 +72,10 @@ export function WalletConnectButton({ className }: { className?: string }) {
       address: address ? `${address.slice(0, 6)}...${address.slice(-4)}` : "none",
     })
   }, [isConnected, address])
+
+  useEffect(() => {
+    console.log("[v0] Dropdown menu state changed:", { isOpen })
+  }, [isOpen])
 
   useEffect(() => {
     if (connectError) {
@@ -127,6 +141,24 @@ export function WalletConnectButton({ className }: { className?: string }) {
     })
   }
 
+  const handleButtonClick = (e: React.MouseEvent) => {
+    console.log("[v0] Connect Wallet button clicked - event details:", {
+      type: e.type,
+      target: e.target,
+      currentTarget: e.currentTarget,
+      isConnecting,
+      isOpen,
+    })
+
+    if (isConnecting) {
+      console.log("[v0] Button click ignored - already connecting")
+      return
+    }
+
+    console.log("[v0] Opening dropdown menu")
+    setIsOpen(true)
+  }
+
   if (isConnected && address) {
     return (
       <>
@@ -178,7 +210,13 @@ export function WalletConnectButton({ className }: { className?: string }) {
   }
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen} modal={true}>
+    <DropdownMenu
+      open={isOpen}
+      onOpenChange={(open) => {
+        console.log("[v0] Dropdown onOpenChange called:", open)
+        setIsOpen(open)
+      }}
+    >
       <DropdownMenuTrigger asChild>
         <Button
           variant="outline"
@@ -192,16 +230,13 @@ export function WalletConnectButton({ className }: { className?: string }) {
             className,
           )}
           disabled={isConnecting}
-          onClick={(e) => {
-            console.log("[v0] Connect Wallet button clicked")
-            setIsOpen(true)
-          }}
+          onClick={handleButtonClick}
         >
           <span className="mr-2">👛</span>
           {isConnecting ? "Connecting..." : "Connect Wallet"}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[9999] mt-4">
+      <DropdownMenuContent align="end" className="bg-gray-900 border-gray-700 z-[9999]">
         {connectors.length === 0 ? (
           <DropdownMenuItem disabled className="text-gray-500">
             No wallets available
@@ -212,10 +247,11 @@ export function WalletConnectButton({ className }: { className?: string }) {
               <DropdownMenuItem
                 key={connector.id}
                 onClick={async () => {
-                  console.log("[v0] Connecting to wallet:", connector.name)
+                  console.log("[v0] Wallet connector selected:", connector.name, connector.id)
                   setIsOpen(false)
                   setIsConnecting(true)
                   try {
+                    console.log("[v0] Calling connectWith for:", connector.name)
                     await connectWith(connector)
                     console.log("[v0] Connect function completed for:", connector.name)
                   } catch (error) {
