@@ -71,21 +71,39 @@ if (typeof window !== "undefined") {
   }
 }
 
-export const config = createConfig({
-  chains: SUPPORTED_CHAINS,
-  connectors: [
+function createConnectors() {
+  const connectors = [
     injected({ shimDisconnect: true }),
     metaMask({ shimDisconnect: true }),
     coinbaseWallet({
       appName: "newnity",
       preference: "eoaOnly",
     }),
-    walletConnect({
-      projectId: WC_PROJECT_ID || "___MISSING_PROJECT_ID___",
-      showQrModal: true,
-      metadata,
-    }),
-  ],
+  ]
+
+  if (WC_PROJECT_ID) {
+    try {
+      const wcConnector = walletConnect({
+        projectId: WC_PROJECT_ID,
+        showQrModal: true,
+        metadata,
+      })
+      connectors.push(wcConnector)
+      console.log("[v0] WalletConnect connector initialized successfully")
+    } catch (error) {
+      console.error("[v0] Failed to initialize WalletConnect connector:", error)
+      console.warn("[v0] WalletConnect will be available via fallback in wallet-connect-button.tsx")
+    }
+  } else {
+    console.warn("[v0] WC_PROJECT_ID is missing, WalletConnect connector not initialized")
+  }
+
+  return connectors
+}
+
+export const config = createConfig({
+  chains: SUPPORTED_CHAINS,
+  connectors: createConnectors(),
   transports: {
     [baseSepoliaCustom.id]: http(),
     [baseMainnetCustom.id]: http(),
