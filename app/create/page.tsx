@@ -268,8 +268,11 @@ export default function CreateCampaignPage() {
                 <span className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground">$</span>
                 <Input
                   type="number"
-                  value={localAmount === 0 ? "" : localAmount}
-                  onChange={(e) => setLocalAmount(Number(e.target.value))}
+                  inputMode="numeric"
+                  min={1}
+                  step={1}
+                  value={localAmount || ""}
+                  onChange={(e) => setLocalAmount(e.target.value === "" ? 0 : Number(e.target.value))}
                   onBlur={handleAmountBlur}
                   placeholder="25"
                   className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
@@ -334,14 +337,14 @@ export default function CreateCampaignPage() {
                 <Input
                   type="number"
                   name="tier-quantity"
-                  min={0}
+                  min={1}
                   step={1}
                   inputMode="numeric"
                   pattern="[0-9]*"
                   value={tier.quantity ?? ""}
                   onChange={(e) => {
                     const v = e.target.value === "" ? null : Number(e.target.value)
-                    onUpdate({ ...tier, quantity: Number.isFinite(v) ? v : null })
+                    onUpdate({ ...tier, quantity: v })
                   }}
                   onWheel={(e) => e.currentTarget.blur()}
                   placeholder="100"
@@ -1085,13 +1088,22 @@ export default function CreateCampaignPage() {
                             <Input
                               id="goal"
                               type="number"
-                              value={campaignData.funding.goal === 0 ? "" : campaignData.funding.goal}
+                              inputMode="numeric"
+                              min={1}
+                              step={1}
+                              value={campaignData.funding.goal || ""}
                               onChange={(e) => {
                                 const value = e.target.value === "" ? 0 : Number(e.target.value)
                                 setCampaignData((prev) => ({
                                   ...prev,
                                   funding: { ...prev.funding, goal: value },
                                 }))
+                                if (value > 0) {
+                                  setErrors((prev) => {
+                                    const { goal, ...rest } = prev
+                                    return rest
+                                  })
+                                }
                               }}
                               placeholder="50000"
                               className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
@@ -1151,7 +1163,10 @@ export default function CreateCampaignPage() {
                             <Input
                               id="minPledge"
                               type="number"
-                              value={campaignData.funding.minPledge === 0 ? "" : campaignData.funding.minPledge}
+                              inputMode="numeric"
+                              min={1}
+                              step={1}
+                              value={campaignData.funding.minPledge || ""}
                               onChange={(e) => {
                                 const value = e.target.value === "" ? 0 : Number(e.target.value)
                                 setCampaignData((prev) => ({
