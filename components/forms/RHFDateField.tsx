@@ -1,5 +1,6 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Controller } from "react-hook-form"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
@@ -19,16 +20,25 @@ export function RHFDateField({
   placeholder?: string
   minDate?: Date
 }) {
+  const [mounted, setMounted] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  useEffect(() => setMounted(true), [])
+
+  if (!mounted) {
+    return <div className="h-9 w-full rounded-md border border-input bg-background" />
+  }
+
   return (
     <Controller
       name={name}
       control={control}
       render={({ field, fieldState }) => (
-        <Popover>
+        <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
               type="button"
-              // ✅ disabledは絶対につけない（Triggerが死ぬため）。見た目はクラスで制御。
+              onClick={() => setOpen((v) => !v)}
               className={cn(
                 "w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background",
                 !field.value && "text-muted-foreground",
@@ -44,7 +54,10 @@ export function RHFDateField({
             <Calendar
               mode="single"
               selected={field.value as Date | undefined}
-              onSelect={field.onChange}
+              onSelect={(d) => {
+                field.onChange(d)
+                setOpen(false)
+              }}
               initialFocus
               disabled={(date) => !!minDate && date < minDate}
             />

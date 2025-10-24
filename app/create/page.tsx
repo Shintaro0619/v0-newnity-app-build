@@ -28,6 +28,7 @@ import { usdToUsdc } from "@/lib/utils/money" // Import usdToUsdc
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { UseSessionWalletReset } from "@/components/use-session-wallet-reset" // Added UseSessionWalletReset
 
 const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
   ssr: false,
@@ -272,6 +273,7 @@ export default function CreateCampaignPage() {
     const [localAmount, setLocalAmount] = useState(tier.amount)
     const [localDescription, setLocalDescription] = useState(tier.description)
     const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
+    const [localQuantity, setLocalQuantity] = useState<string>(tier.quantity?.toString() ?? "")
 
     const handleTitleBlur = () => {
       if (localTitle !== tier.title) {
@@ -288,6 +290,13 @@ export default function CreateCampaignPage() {
     const handleDescriptionBlur = () => {
       if (localDescription !== tier.description) {
         onUpdate({ ...tier, description: localDescription })
+      }
+    }
+
+    const handleQuantityBlur = () => {
+      const numValue = localQuantity === "" ? null : Number(localQuantity)
+      if (numValue !== tier.quantity) {
+        onUpdate({ ...tier, quantity: numValue })
       }
     }
 
@@ -395,11 +404,9 @@ export default function CreateCampaignPage() {
                   "border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background",
                   !tier.isLimited && "opacity-50",
                 )}
-                value={tier.quantity ?? ""}
-                onChange={(e) => {
-                  const v = e.target.value === "" ? null : Number(e.target.value)
-                  onUpdate({ ...tier, quantity: v })
-                }}
+                value={localQuantity}
+                onChange={(e) => setLocalQuantity(e.target.value)}
+                onBlur={handleQuantityBlur}
                 onWheel={(e) => e.currentTarget.blur()}
                 placeholder="100"
               />
@@ -770,6 +777,7 @@ export default function CreateCampaignPage() {
 
   return (
     <div className="min-h-screen bg-background">
+      <UseSessionWalletReset />
       <div className="container mx-auto px-4 pt-24 pb-8">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Header */}
