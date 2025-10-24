@@ -40,13 +40,14 @@ export function WalletConnectButton() {
           reset()
           setOpen(true)
         }}
-        className="bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-500 text-black font-semibold rounded-xl px-4 h-10 shadow-[0_8px_20px_rgba(16,185,129,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 transition"
+        variant="wallet"
+        className="rounded-xl px-4 h-10 font-semibold"
       >
         Connect Wallet
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-[520px] rounded-2xl border border-white/12 bg-[#0A0D0C]/95 shadow-2xl ring-1 ring-emerald-400/20 backdrop-blur supports-[backdrop-filter]:bg-[#0A0D0C]/80">
+        <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
             <DialogTitle>Select a wallet</DialogTitle>
             <DialogDescription>Choose a wallet provider to connect to newnity</DialogDescription>
@@ -55,8 +56,8 @@ export function WalletConnectButton() {
             {visibleConnectors.map((c) => (
               <Button
                 key={c.uid}
-                className="w-full text-left rounded-lg border border-white/10 bg-white/2 hover:bg-white/6 px-4 py-3 transition"
-                disabled={status === "pending"}
+                variant={c.ready !== false ? "wallet" : "secondary"}
+                disabled={status === "pending" || c.ready === false}
                 onClick={async () => {
                   try {
                     await connect({ connector: c })
@@ -65,8 +66,11 @@ export function WalletConnectButton() {
                     console.error("[WalletConnectButton] connect error:", e)
                   }
                 }}
+                className="h-12 w-full justify-start gap-3 rounded-xl"
+                data-wallet-option={c.name}
               >
-                {c.name}
+                {c.icon && <img src={c.icon || "/placeholder.svg"} alt="" className="h-5 w-5 shrink-0" />}
+                <span className="font-medium">{c.name}</span>
               </Button>
             ))}
             {error && <p className="text-red-500 text-sm mt-2">{error.message}</p>}
