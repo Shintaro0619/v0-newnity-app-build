@@ -40,13 +40,13 @@ export function WalletConnectButton() {
           reset()
           setOpen(true)
         }}
-        className="bg-white/10 hover:bg-green-600 hover:text-black transition-colors"
+        className="bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-500 text-black font-semibold rounded-xl px-4 h-10 shadow-[0_8px_20px_rgba(16,185,129,0.35)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 transition"
       >
         Connect Wallet
       </Button>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-[520px] rounded-2xl border border-white/12 bg-[#0A0D0C]/95 shadow-2xl ring-1 ring-emerald-400/20 backdrop-blur supports-[backdrop-filter]:bg-[#0A0D0C]/80">
           <DialogHeader>
             <DialogTitle>Select a wallet</DialogTitle>
             <DialogDescription>Choose a wallet provider to connect to newnity</DialogDescription>
@@ -55,7 +55,7 @@ export function WalletConnectButton() {
             {visibleConnectors.map((c) => (
               <Button
                 key={c.uid}
-                className="w-full"
+                className="w-full text-left rounded-lg border border-white/10 bg-white/2 hover:bg-white/6 px-4 py-3 transition"
                 disabled={status === "pending"}
                 onClick={async () => {
                   try {
