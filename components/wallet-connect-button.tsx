@@ -1,28 +1,50 @@
 "use client"
-import { useState } from "react"
-import { useAccount, useConnect } from "wagmi"
+
+import { useMemo, useState } from "react"
+import { useAccount, useConnect, useDisconnect } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { base, baseSepolia } from "wagmi/chains"
-
-const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id]
 
 export function WalletConnectButton() {
-  const { isConnected } = useAccount()
-  const { connectors, connect, isPending, error } = useConnect()
+  const { isConnected, address } = useAccount()
+  const { connectors, connect, status, error, reset } = useConnect()
+  const { disconnect } = useDisconnect()
   const [open, setOpen] = useState(false)
 
-  if (isConnected) return null
+  const visibleConnectors = useMemo(() => {
+    if (typeof window === "undefined") return connectors
+    const hasInjected = (window as any).ethereum || (window as any).okxwallet || (window as any).phantom
+    return connectors.filter((c) => c.id !== "injected" || hasInjected)
+  }, [connectors])
+
+  if (isConnected) {
+    return (
+      <div className="flex items-center gap-2">
+        <a className="underline text-sm" href={`/profile/${address}`}>
+          View
+        </a>
+        <a className="underline text-sm" href="/settings">
+          Edit
+        </a>
+        <Button variant="secondary" size="sm" onClick={() => disconnect()}>
+          Disconnect
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
-        disabled={isPending}
+        onClick={() => {
+          reset()
+          setOpen(true)
+        }}
         className="bg-white/10 hover:bg-green-600 hover:text-black transition-colors"
       >
-        {isPending ? "Connecting…" : "Connect Wallet"}
+        Connect Wallet
       </Button>
+
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>
           <DialogHeader>
@@ -30,21 +52,25 @@ export function WalletConnectButton() {
             <DialogDescription>Choose a wallet provider to connect to newnity</DialogDescription>
           </DialogHeader>
           <div className="space-y-2">
-            {connectors.map((c) => (
+            {visibleConnectors.map((c) => (
               <Button
                 key={c.uid}
-                className="w-full justify-between"
-                disabled={!c.ready || isPending}
-                onClick={() => {
-                  connect({ connector: c })
-                  setOpen(false)
+                className="w-full"
+                disabled={status === "pending"}
+                onClick={async () => {
+                  try {
+                    await connect({ connector: c })
+                    setOpen(false)
+                  } catch (e) {
+                    console.error("[WalletConnectButton] connect error:", e)
+                  }
                 }}
               >
                 {c.name}
               </Button>
             ))}
+            {error && <p className="text-red-500 text-sm mt-2">{error.message}</p>}
           </div>
-          {error ? <p className="text-sm text-red-500 mt-2">{error.message}</p> : null}
         </DialogContent>
       </Dialog>
     </>
