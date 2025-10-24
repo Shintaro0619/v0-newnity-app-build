@@ -49,4 +49,4 @@ export const config = createConfig({
   autoConnect: false,
 })
 
-console.log("[v0] Wagmi config initialized")
+console.log("[v0] Wagmi config initialized with injected connector only")
