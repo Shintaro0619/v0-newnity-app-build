@@ -5,6 +5,7 @@ import { useEffect, useRef } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { WagmiProvider } from "wagmi"
 import { config } from "@/lib/wagmi-config"
+import { AutoDisconnectOnLoad } from "@/components/auto-disconnect-on-load"
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -182,6 +183,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
+        <AutoDisconnectOnLoad />
         <ErrorSuppressor />
         {children}
       </QueryClientProvider>
