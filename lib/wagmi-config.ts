@@ -1,6 +1,7 @@
 import { createConfig, http } from "wagmi"
 import { base, baseSepolia } from "viem/chains"
 import { injected, coinbaseWallet, walletConnect } from "@wagmi/connectors"
+import { createStorage } from "wagmi"
 
 const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ?? ""
 const APP_NAME = process.env.NEXT_PUBLIC_APP_NAME ?? "newnity"
@@ -34,6 +35,9 @@ export const wagmiConfig = createConfig({
   },
   connectors,
   ssr: true,
+  storage: createStorage({
+    storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
+  }),
   autoConnect: false,
 })
 

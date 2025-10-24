@@ -21,9 +21,13 @@ import Link from "next/link"
 import dynamic from "next/dynamic"
 import { MediaUpload } from "@/components/ui/media-upload"
 import { Save, ImageIcon, Target, Users, DollarSign, Plus, Trash2, ArrowLeft, CalendarIcon } from "lucide-react"
+import { cn } from "@/lib/utils" // Import cn utility
 
 import { useTierScrollGuard } from "@/components/hooks/useTierScrollGuard"
 import { usdToUsdc } from "@/lib/utils/money" // Import usdToUsdc
+import { useForm } from "react-hook-form"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { z } from "zod"
 
 const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
   ssr: false,
@@ -139,6 +143,26 @@ const categories = [
   "Other",
 ]
 
+const FundingSchema = z.object({
+  goal: z.coerce.number().gt(0, "Funding goal must be greater than 0"),
+  minPledge: z.coerce.number().gte(1, "Minimum pledge must be at least 1"),
+  endDate: z.coerce.date({ required_error: "Please select a campaign end date" }),
+})
+
+const RewardTierSchema = z.object({
+  title: z.string().min(1, "Title is required"),
+  amount: z.coerce.number().gte(1, "Amount must be at least 1"),
+  description: z.string().min(1, "Description is required"),
+  deliveryDate: z.coerce.date().optional(),
+  isLimited: z.boolean().default(false),
+  quantity: z
+    .preprocess((v) => (v === "" || v === undefined ? undefined : Number(v)), z.number().int().positive().optional())
+    .refine((v, ctx) => {
+      if (ctx.parent?.isLimited && !v) return false
+      return true
+    }, "Quantity required when Limited is enabled"),
+})
+
 export default function CreateCampaignPage() {
   const { address, isConnected } = useAccount()
   const router = useRouter()
@@ -147,7 +171,7 @@ export default function CreateCampaignPage() {
   const [campaignData, setCampaignData] = useState<CampaignData>(initialCampaignData)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false) // Keep for direct Popover usage
   const [activeTab, setActiveTab] = useState("basic")
   const tierRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const setTierRef = (id: string) => (el: HTMLDivElement | null) => {
@@ -160,6 +184,32 @@ export default function CreateCampaignPage() {
 
   const totalSteps = 5
   const progress = (currentStep / totalSteps) * 100
+
+  // Initialize React Hook Form with Zod
+  const {
+    handleSubmit: handleFormSubmit, // Rename to avoid conflict
+    formState: { errors: formErrors },
+  } = useForm<CampaignData["funding"]>({
+    resolver: zodResolver(FundingSchema),
+    defaultValues: campaignData.funding,
+    mode: "onChange", // Validate as user types
+  })
+
+  const {
+    handleSubmit: handleRewardFormSubmit, // Rename to avoid conflict
+  } = useForm<RewardTier>({
+    // resolver: zodResolver(RewardTierSchema), // This needs to be applied per tier
+    defaultValues: {
+      title: "",
+      amount: 0,
+      description: "",
+      deliveryDate: undefined,
+      quantity: null,
+      isLimited: false,
+      items: [],
+    },
+    mode: "onChange",
+  })
 
   useEffect(() => {
     const isTyping = (el: EventTarget | null) => {
@@ -333,24 +383,26 @@ export default function CreateCampaignPage() {
                   {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
                 </Label>
               </div>
-              {tier.isLimited && (
-                <Input
-                  type="number"
-                  name="tier-quantity"
-                  min={1}
-                  step={1}
-                  inputMode="numeric"
-                  pattern="[0-9]*"
-                  value={tier.quantity ?? ""}
-                  onChange={(e) => {
-                    const v = e.target.value === "" ? null : Number(e.target.value)
-                    onUpdate({ ...tier, quantity: v })
-                  }}
-                  onWheel={(e) => e.currentTarget.blur()}
-                  placeholder="100"
-                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                />
-              )}
+              <Input
+                type="number"
+                name="tier-quantity"
+                min={1}
+                step={1}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                disabled={!tier.isLimited}
+                className={cn(
+                  "border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background",
+                  !tier.isLimited && "opacity-50",
+                )}
+                value={tier.quantity ?? ""}
+                onChange={(e) => {
+                  const v = e.target.value === "" ? null : Number(e.target.value)
+                  onUpdate({ ...tier, quantity: v })
+                }}
+                onWheel={(e) => e.currentTarget.blur()}
+                placeholder="100"
+              />
             </div>
           </div>
         </CardContent>
@@ -518,7 +570,8 @@ export default function CreateCampaignPage() {
     }
 
     if (step === 2) {
-      if (!campaignData.media.mainImage) newErrors.mainImage = "Main campaign image is required"
+      if (!campaignData.media.mainImage && !campaignData.media.mainImageUrl)
+        newErrors.mainImage = "Main campaign image is required"
     }
 
     if (step === 3) {
@@ -1117,7 +1170,7 @@ export default function CreateCampaignPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor="endDate">Campaign End Date *</Label>
-                          <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
+                          <Popover>
                             <PopoverTrigger asChild>
                               <Button
                                 type="button"
@@ -1142,7 +1195,10 @@ export default function CreateCampaignPage() {
                                     funding: { ...prev.funding, endDate: date },
                                   }))
                                   if (date) {
-                                    setIsEndDateOpen(false)
+                                    setErrors((prev) => {
+                                      const { endDate, ...rest } = prev
+                                      return rest
+                                    })
                                   }
                                 }}
                                 disabled={(date) => date < new Date()}
