@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { AuthButton } from "@/components/auth-button"
 import { useAccount } from "wagmi"
+import { useMounted } from "@/hooks/use-mounted"
 
 const WalletConnectButton = dynamic(
   () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
@@ -28,6 +29,7 @@ export function Navbar() {
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const router = useRouter()
   const { isConnected, address } = useAccount()
+  const mounted = useMounted()
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -41,8 +43,6 @@ export function Navbar() {
     setSearchQuery("")
     window.location.href = "/discover"
   }
-
-  console.log("[v0] [NAVBAR] Render - isConnected:", isConnected, "address:", address?.slice(0, 10))
 
   return (
     <nav
@@ -122,7 +122,7 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          {isConnected && address ? <AuthButton /> : <WalletConnectButton />}
+          {!mounted ? <div className="w-32 h-10" /> : isConnected && address ? <AuthButton /> : <WalletConnectButton />}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>

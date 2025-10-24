@@ -46,6 +46,7 @@ export const config = createConfig({
   ssr: true,
   storage: createStorage({ storage: cookieStorage }),
   connectors: buildConnectors(),
+  autoConnect: false,
 })
 
-console.log("[v0] Wagmi config initialized with injected connector only")
+console.log("[v0] Wagmi config initialized")
