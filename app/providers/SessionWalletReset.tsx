@@ -26,6 +26,19 @@ export default function SessionWalletReset() {
         disconnect(config)
       } catch {}
     }
+
+    const onUnload = () => {
+      const keys = Object.keys(localStorage).filter(
+        (k) => k.startsWith("wagmi") || k.startsWith("wc@2") || k.includes("walletlink") || k.startsWith("rk-"),
+      )
+      keys.forEach((k) => {
+        try {
+          localStorage.removeItem(k)
+        } catch {}
+      })
+    }
+    window.addEventListener("beforeunload", onUnload)
+    return () => window.removeEventListener("beforeunload", onUnload)
   }, [])
   return null
 }

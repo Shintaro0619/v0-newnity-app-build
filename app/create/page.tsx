@@ -29,6 +29,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { UseSessionWalletReset } from "@/components/use-session-wallet-reset" // Added UseSessionWalletReset
+import InlineCalendar from "@/components/forms/InlineCalendar" // Import InlineCalendar
 
 const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
   ssr: false,
@@ -354,31 +355,10 @@ export default function CreateCampaignPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Delivery</Label>
-              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
-                  >
-                    <span className="mr-2">📅</span>
-                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={tier.deliveryDate}
-                    onSelect={(date) => {
-                      onUpdate({ ...tier, deliveryDate: date })
-                      if (date) {
-                        setIsDeliveryDateOpen(false)
-                      }
-                    }}
-                    disabled={(date) => date < new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
+              <InlineCalendar
+                value={tier.deliveryDate}
+                onChange={(date) => onUpdate({ ...tier, deliveryDate: date })}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-base font-semibold">Limited Quantity</Label>
@@ -890,7 +870,7 @@ export default function CreateCampaignPage() {
                   </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="basic" className="space-y-6">
+                <TabsContent value="basic" forceMount className="space-y-6">
                   <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1018,7 +998,7 @@ export default function CreateCampaignPage() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="media" className="space-y-6">
+                <TabsContent value="media" forceMount className="space-y-6">
                   <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1131,7 +1111,7 @@ export default function CreateCampaignPage() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="funding" className="space-y-6">
+                <TabsContent value="funding" forceMount className="space-y-6">
                   <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -1178,41 +1158,14 @@ export default function CreateCampaignPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor="endDate">Campaign End Date *</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {campaignData.funding.endDate ? (
-                                  format(campaignData.funding.endDate, "PPP")
-                                ) : (
-                                  <span className="text-muted-foreground">Pick an end date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={campaignData.funding.endDate}
-                                onSelect={(date) => {
-                                  setCampaignData((prev) => ({
-                                    ...prev,
-                                    funding: { ...prev.funding, endDate: date },
-                                  }))
-                                  if (date) {
-                                    setErrors((prev) => {
-                                      const { endDate, ...rest } = prev
-                                      return rest
-                                    })
-                                  }
-                                }}
-                                disabled={(date) => date < new Date()}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <InlineCalendar
+                            value={campaignData.funding.endDate}
+                            onChange={(date) => {
+                              setCampaignData((prev) => ({ ...prev, funding: { ...prev.funding, endDate: date } }))
+                              if (date) setErrors(({ endDate, ...rest }) => rest)
+                            }}
+                            minDate={new Date()}
+                          />
                           {errors.endDate && <p className="text-sm font-semibold text-destructive">{errors.endDate}</p>}
                           <p className="text-xs text-muted-foreground">
                             Campaign will end at 23:59:59 UTC on the selected day. Most successful campaigns run for
@@ -1261,7 +1214,7 @@ export default function CreateCampaignPage() {
                   </Card>
                 </TabsContent>
 
-                <TabsContent value="tiers" className="space-y-6">
+                <TabsContent value="tiers" forceMount className="space-y-6">
                   <Card className="border-2 border-primary/20">
                     <CardHeader>
                       <div className="flex items-center justify-between">
