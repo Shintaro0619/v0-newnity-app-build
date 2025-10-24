@@ -56,7 +56,7 @@ export function RHFDateField({
             align="start"
             side="bottom"
             sideOffset={6}
-            style={{ zIndex: 9999, position: "fixed" }}
+            style={{ zIndex: 2147483647, position: "fixed" }}
           >
             <Calendar
               mode="single"

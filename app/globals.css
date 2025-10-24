@@ -451,3 +451,27 @@ plasmo-csui,
 plasmo-csui * {
   pointer-events: none !important;
 }
+
+/* Popover最前面化を32bit上限に強化 */
+[data-radix-popover-content],
+[data-radix-select-content],
+[data-radix-dialog-content] {
+  z-index: 2147483647 !important; /* 32bit上限 */
+}
+
+/* 各種ウォレット/拡張オーバーレイのクリックを禁止（UI自体は開ける） */
+.walletlink-ui-container,
+.cbwsdk-container /* coinbase sdk */,
+#walletconnect-wrapper,
+#wcm-modal,
+#wcm-container,
+wc-modal,
+plasmo-csui,
+plasmo-csui *,
+#metamask-notification,
+.metamask-extension,
+#phantom-iframe,
+#trust-wallet-bridge {
+  pointer-events: none !important;
+  z-index: 1 !important;
+}

@@ -143,6 +143,9 @@ importers:
       '@stackframe/stack':
         specifier: latest
         version: 2.8.44(@aws-sdk/credential-provider-web-identity@3.907.0)(@types/react-dom@18.0.0)(@types/react@18.0.0)(buffer@6.0.3)(next@14.2.16(@babel/core@7.28.4)(@opentelemetry/api@1.9.0)(react-dom@18.0.0(react@18.0.0))(react@18.0.0))(react-dom@18.0.0(react@18.0.0))(react@18.0.0)(tailwindcss@4.1.9)
+      '@tanstack/query-core':
+        specifier: latest
+        version: 5.90.5
       '@tanstack/react-query':
         specifier: latest
         version: 5.90.5(react@18.0.0)
@@ -210,7 +213,7 @@ importers:
         specifier: latest
         version: 6.1.0(fb889ec70402f46e28e81784b9a0c5fc)
       '@wagmi/core':
-        specifier: 2.22.1
+        specifier: latest
         version: 2.22.1(@tanstack/query-core@5.90.5)(@types/react@18.0.0)(immer@10.1.3)(react@18.0.0)(typescript@5.0.2)(use-sync-external-store@1.6.0(react@18.0.0))(viem@2.38.4(bufferutil@4.0.9)(typescript@5.0.2)(utf-8-validate@5.0.10)(zod@3.25.67))
       autoprefixer:
         specifier: ^10.4.20
