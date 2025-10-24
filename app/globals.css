@@ -433,3 +433,21 @@
   gap: 0.75rem !important;
   align-items: flex-start !important;
 }
+
+/* Adding Popover z-index and walletlink pointer-events fix */
+/* Popoverを最前面に */
+[data-radix-popover-content] {
+  z-index: 9999;
+}
+
+/* Coinbase Wallet (walletlink) の空コンテナがクリックをさらわないように */
+.walletlink-ui-container {
+  pointer-events: none !important;
+  z-index: 1 !important;
+}
+
+/* 一部環境で拡張の overlay が乗る場合（plasmo系）*/
+plasmo-csui,
+plasmo-csui * {
+  pointer-events: none !important;
+}

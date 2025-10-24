@@ -50,7 +50,14 @@ export function RHFDateField({
               {field.value ? format(field.value as Date, "PPP") : <span>{placeholder}</span>}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          <PopoverContent
+            forceMount
+            className="w-auto p-0"
+            align="start"
+            side="bottom"
+            sideOffset={6}
+            style={{ zIndex: 9999, position: "fixed" }}
+          >
             <Calendar
               mode="single"
               selected={field.value as Date | undefined}
