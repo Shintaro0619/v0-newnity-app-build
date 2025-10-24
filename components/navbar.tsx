@@ -29,7 +29,7 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const router = useRouter()
-  const { status, address } = useAccount()
+  const { isConnected, address } = useAccount()
   const mounted = useMounted()
 
   const handleSearch = (e: React.FormEvent) => {
@@ -123,13 +123,7 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          {!mounted ? (
-            <div className="w-32 h-10" />
-          ) : status === "connected" && address ? (
-            <AuthButton />
-          ) : (
-            <WalletConnectButton />
-          )}
+          {!mounted ? <div className="w-32 h-10" /> : isConnected ? <AuthButton /> : <WalletConnectButton />}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>

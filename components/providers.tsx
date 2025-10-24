@@ -1,20 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useMemo, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { WagmiProvider } from "wagmi"
-import { config } from "@/lib/wagmi-config"
+import { makeWagmiConfig } from "@/lib/wagmi-config"
 import { AutoDisconnectOnLoad } from "@/components/auto-disconnect-on-load"
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-    },
-  },
-})
 
 function ErrorSuppressor() {
   const initialized = useRef(false)
@@ -180,6 +171,9 @@ function ErrorSuppressor() {
 }
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const [queryClient] = useState(() => new QueryClient())
+  const config = useMemo(() => makeWagmiConfig(), [])
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>

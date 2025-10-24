@@ -1,52 +1,34 @@
 "use client"
 
-import { createConfig, http, cookieStorage, createStorage } from "wagmi"
-import { base, baseSepolia } from "wagmi/chains"
-import { injected, walletConnect, coinbaseWallet } from "wagmi/connectors"
+import { createConfig, http } from "wagmi"
+import { mainnet, base, baseSepolia } from "wagmi/chains"
+import { injected, walletConnect } from "wagmi/connectors"
 
-const isClient = typeof window !== "undefined"
+const projectId = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID
 
-// 両方の環境変数名に対応
-const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WALLET_CONNECT_PROJECT_ID || process.env.NEXT_PUBLIC_WC_PROJECT_ID || ""
+export function makeWagmiConfig() {
+  const connectors = [injected({ shimDisconnect: true })]
 
-function buildConnectors() {
-  const list = [
-    injected({ shimDisconnect: true }),
-    coinbaseWallet({ appName: "newnity", preference: "eoaOnly" }),
-  ] as any[]
-
-  // クライアント側でのみWalletConnectを追加
-  if (isClient && WC_PROJECT_ID) {
-    list.push(
-      walletConnect({
-        projectId: WC_PROJECT_ID,
-        showQrModal: true,
-        metadata: {
-          name: "newnity",
-          description: "USDC crowdfunding on Base",
-          url: "https://newnity.vercel.app",
-          icons: ["https://newnity.vercel.app/icon.png"],
-        },
-      }),
-    )
-    console.log("[v0] WalletConnect connector initialized successfully")
+  if (typeof window !== "undefined" && projectId) {
+    connectors.push(walletConnect({ projectId, showQrModal: true }))
   } else {
-    console.warn("[v0] WalletConnect not initialized:", { isClient, hasProjectId: !!WC_PROJECT_ID })
+    console.log("[v0] WalletConnect not initialized", {
+      isClient: typeof window !== "undefined",
+      hasProjectId: !!projectId,
+    })
   }
 
-  return list
+  return createConfig({
+    chains: [base, baseSepolia, mainnet],
+    transports: {
+      [base.id]: http(),
+      [baseSepolia.id]: http(),
+      [mainnet.id]: http(),
+    },
+    connectors,
+    autoConnect: false,
+    ssr: true,
+  })
 }
 
-export const config = createConfig({
-  chains: [base, baseSepolia],
-  transports: {
-    [base.id]: http(),
-    [baseSepolia.id]: http(),
-  },
-  ssr: true,
-  storage: createStorage({ storage: cookieStorage }),
-  connectors: buildConnectors(),
-  autoConnect: false,
-})
-
-console.log("[v0] Wagmi config initialized with injected connector only")
+export const config = makeWagmiConfig()

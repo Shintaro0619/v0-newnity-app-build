@@ -1,12 +1,10 @@
 "use client"
-import { useState } from "react"
+import { useState, useMemo } from "react"
 import { useAccount, useConnect } from "wagmi"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
-import { switchChain } from "wagmi/actions"
-import { config } from "@/lib/wagmi-config"
 import { base, baseSepolia } from "wagmi/chains"
 
 const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id]
@@ -17,45 +15,37 @@ export function WalletConnectButton({ className }: { className?: string }) {
   const { toast } = useToast()
   const [open, setOpen] = useState(false)
 
-  if (isConnected) {
-    return null
-  }
+  const injectedConnector = useMemo(() => connectors.find((c) => c.id === "injected"), [connectors])
 
-  const handleConnect = async (connector: any) => {
-    const targetChainId = SUPPORTED_CHAIN_IDS[0]
-
-    try {
-      // Try to switch chain before connecting
-      try {
-        await switchChain(config, { chainId: targetChainId })
-      } catch (switchError) {
-        console.warn("[v0] Chain switch rejected before connection:", switchError)
-        // If user rejects chain switch, don't proceed with connection
-        return
-      }
-
-      await connectAsync({ connector, chainId: targetChainId })
+  const handleClick = () => {
+    if (injectedConnector) {
+      connectAsync({ connector: injectedConnector })
       setOpen(false)
       toast({
         title: "Wallet Connected",
-        description: `Connected with ${connector.name}`,
+        description: `Connected with ${injectedConnector.name}`,
       })
-    } catch (error) {
-      console.error("[v0] Connection error:", error)
-      if (error instanceof Error && !error.message.includes("rejected")) {
-        toast({
-          title: "Connection Failed",
-          description: error.message || "Failed to connect wallet",
-          variant: "destructive",
-        })
-      }
+      return
     }
+    // injectedがなければ最初のコネクタ（WalletConnectなど）を使用
+    if (connectors[0]) {
+      connectAsync({ connector: connectors[0] })
+      setOpen(false)
+      toast({
+        title: "Wallet Connected",
+        description: `Connected with ${connectors[0].name}`,
+      })
+    }
+  }
+
+  if (isConnected) {
+    return null
   }
 
   return (
     <>
       <Button
-        onClick={() => setOpen(true)}
+        onClick={handleClick}
         className={cn("bg-white/10 hover:bg-green-600 hover:text-black transition-colors", className)}
         disabled={status === "pending"}
       >
@@ -73,7 +63,7 @@ export function WalletConnectButton({ className }: { className?: string }) {
               <Button
                 key={connector.id}
                 variant="outline"
-                onClick={() => handleConnect(connector)}
+                onClick={() => connectAsync({ connector })}
                 className="justify-start"
                 disabled={status === "pending"}
               >
