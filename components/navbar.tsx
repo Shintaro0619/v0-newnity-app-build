@@ -5,7 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BrandMark } from "@/components/brand-mark"
 import { Input } from "@/components/ui/input"
-import { useState, useEffect } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
 import { AuthButton } from "@/components/auth-button"
@@ -26,13 +26,8 @@ const WalletConnectButton = dynamic(
 export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showMobileSearch, setShowMobileSearch] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   const { isConnected, address } = useAccount()
-
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,6 +41,8 @@ export function Navbar() {
     setSearchQuery("")
     window.location.href = "/discover"
   }
+
+  console.log("[v0] [NAVBAR] Render - isConnected:", isConnected, "address:", address?.slice(0, 10))
 
   return (
     <nav
@@ -125,7 +122,7 @@ export function Navbar() {
             {showMobileSearch ? "✕" : "🔍"}
           </Button>
 
-          {mounted && <>{isConnected && address ? <AuthButton /> : <WalletConnectButton />}</>}
+          {isConnected && address ? <AuthButton /> : <WalletConnectButton />}
 
           <Link href="/create">
             <Button className="bg-primary hover:bg-primary/90 text-black font-bold glow-primary">Start Campaign</Button>

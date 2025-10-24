@@ -2,7 +2,7 @@
 
 import type React from "react"
 import { useAccount } from "wagmi"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -11,9 +11,9 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { useToast } from "@/hooks/use-toast"
-import { Loader2, Upload, User, Globe, FileText, Mail, Database } from "lucide-react"
+import { Loader2, Upload, User, Globe, FileText, Mail } from "lucide-react"
 import Link from "next/link"
-import { getUserProfile, updateUserProfile, uploadAvatar, runDatabaseMigration } from "./actions"
+import { getUserProfile, updateUserProfile, uploadAvatar } from "./actions"
 
 console.log("[v0] [CLIENT] ProfileSettingsClient module loaded")
 
@@ -26,7 +26,6 @@ export function ProfileSettingsClient() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [initialLoading, setInitialLoading] = useState(true)
-  const [migrating, setMigrating] = useState(false)
   const prevIsConnected = useRef(isConnected)
   const [formData, setFormData] = useState({
     name: "",
@@ -42,30 +41,7 @@ export function ProfileSettingsClient() {
 
   console.log("[v0] [CLIENT] Account state:", { address, isConnected })
 
-  useEffect(() => {
-    // Check if wallet was connected and is now disconnected
-    if (prevIsConnected.current && !isConnected) {
-      console.log("[v0] [CLIENT] Wallet disconnected, redirecting to home...")
-      toast({
-        title: "Wallet Disconnected",
-        description: "Redirecting to home page...",
-      })
-      router.push("/")
-    }
-    // Update the ref with current connection state
-    prevIsConnected.current = isConnected
-  }, [isConnected, router, toast])
-
-  useEffect(() => {
-    console.log("[v0] [CLIENT] useEffect triggered, address:", address, "isConnected:", isConnected)
-    if (address && isConnected) {
-      loadUserProfile()
-    } else {
-      setInitialLoading(false)
-    }
-  }, [address, isConnected])
-
-  async function loadUserProfile() {
+  const loadUserProfile = useCallback(async () => {
     if (!address) return
 
     try {
@@ -98,7 +74,30 @@ export function ProfileSettingsClient() {
     } finally {
       setInitialLoading(false)
     }
-  }
+  }, [address])
+
+  useEffect(() => {
+    // Check if wallet was connected and is now disconnected
+    if (prevIsConnected.current && !isConnected) {
+      console.log("[v0] [CLIENT] Wallet disconnected, redirecting to home...")
+      toast({
+        title: "Wallet Disconnected",
+        description: "Redirecting to home page...",
+      })
+      router.push("/")
+    }
+    // Update the ref with current connection state
+    prevIsConnected.current = isConnected
+  }, [isConnected, router, toast])
+
+  useEffect(() => {
+    console.log("[v0] [CLIENT] useEffect triggered, address:", address, "isConnected:", isConnected)
+    if (address && isConnected) {
+      loadUserProfile()
+    } else {
+      setInitialLoading(false)
+    }
+  }, [address, isConnected, loadUserProfile])
 
   async function handleAvatarUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
@@ -217,74 +216,13 @@ export function ProfileSettingsClient() {
     }
   }
 
-  async function handleRunMigration() {
-    setMigrating(true)
-    try {
-      console.log("[v0] [CLIENT] Running database migration...")
-
-      const result = await runDatabaseMigration()
-
-      if (!result.success) {
-        console.log("[v0] [CLIENT] Migration failed:", result.error)
-        toast({
-          title: "Migration failed",
-          description: result.error,
-          variant: "destructive",
-        })
-        return
-      }
-
-      console.log("[v0] [CLIENT] Migration completed successfully")
-      toast({
-        title: "Migration completed",
-        description: result.message,
-      })
-    } catch (error) {
-      console.error("[v0] [CLIENT] Error running migration:", error)
-
-      const errorMessage = error instanceof Error ? error.message : "Failed to run migration. Please try again."
-
-      toast({
-        title: "Migration failed",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      setMigrating(false)
-    }
-  }
-
   return (
     <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-8 max-w-2xl">
+      <div className="container mx-auto px-4 pt-24 pb-8 max-w-2xl">
         <div className="mb-8">
           <h1 className="text-2xl md:text-3xl font-bold mb-2">Profile Settings</h1>
           <p className="text-sm md:text-base text-muted-foreground">Manage your public profile information</p>
         </div>
-
-        <Card className="mb-6 border-yellow-500/50 bg-yellow-500/5">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Database className="h-5 w-5" />
-              Database Migration Required
-            </CardTitle>
-            <CardDescription>
-              If you're experiencing issues saving your profile with an existing email address, run this migration to
-              allow multiple wallets to use the same email.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={handleRunMigration}
-              disabled={migrating}
-              variant="outline"
-              className="w-full sm:w-auto bg-transparent"
-            >
-              {migrating && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-              Run Database Migration
-            </Button>
-          </CardContent>
-        </Card>
 
         {!isConnected || !address ? (
           <Card className="w-full">

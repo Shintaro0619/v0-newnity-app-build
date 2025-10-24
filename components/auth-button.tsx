@@ -20,11 +20,33 @@ export function AuthButton() {
   const { disconnect } = useDisconnect()
   const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [currentAddress, setCurrentAddress] = useState<string | undefined>(undefined)
 
   useEffect(() => {
+    console.log(
+      "[v0] [AUTH_BUTTON] Connection state changed - isConnected:",
+      isConnected,
+      "address:",
+      address?.slice(0, 10),
+    )
+
     if (!isConnected || !address) {
       console.log("[v0] [AUTH_BUTTON] Clearing profile - wallet disconnected")
       setUserProfile(null)
+      setCurrentAddress(undefined)
+      return
+    }
+
+    if (currentAddress && currentAddress !== address) {
+      console.log("[v0] [AUTH_BUTTON] Address changed - clearing old profile")
+      setUserProfile(null)
+    }
+
+    setCurrentAddress(address)
+  }, [address, isConnected, currentAddress])
+
+  useEffect(() => {
+    if (!isConnected || !address) {
       return
     }
 
@@ -33,11 +55,12 @@ export function AuthButton() {
       try {
         console.log("[v0] [AUTH_BUTTON] Loading profile for:", address)
         const data = await getUserProfile(address)
-        if (data.profile) {
+
+        if (data.profile && data.profile.wallet_address?.toLowerCase() === address?.toLowerCase()) {
           console.log("[v0] [AUTH_BUTTON] Profile loaded:", data.profile.name)
           setUserProfile(data.profile)
         } else {
-          console.log("[v0] [AUTH_BUTTON] No profile found for:", address)
+          console.log("[v0] [AUTH_BUTTON] No profile found or address mismatch for:", address)
           setUserProfile(null)
         }
       } catch (error) {
@@ -52,6 +75,7 @@ export function AuthButton() {
   }, [address, isConnected])
 
   if (!isConnected || !address) {
+    console.log("[v0] [AUTH_BUTTON] Not rendering - wallet not connected")
     return null
   }
 
@@ -59,16 +83,19 @@ export function AuthButton() {
   const profileMatches = userProfile?.wallet_address?.toLowerCase() === address?.toLowerCase()
   const showProfile = profileMatches && !isLoading
 
+  console.log("[v0] [AUTH_BUTTON] Rendering - showProfile:", showProfile, "profileName:", userProfile?.name)
+
   const handleDisconnect = () => {
     console.log("[v0] [AUTH_BUTTON] Disconnecting wallet")
     setUserProfile(null)
+    setCurrentAddress(undefined)
     disconnect()
   }
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+        <Button variant="ghost" className="relative h-10 rounded-full px-3 gap-2">
           <Avatar className="h-8 w-8">
             <AvatarImage
               src={showProfile && userProfile.avatar ? userProfile.avatar : undefined}
@@ -80,6 +107,9 @@ export function AuthButton() {
                 : displayName.charAt(0).toUpperCase()}
             </AvatarFallback>
           </Avatar>
+          <span className="text-sm font-medium text-white">
+            {showProfile && userProfile.name ? userProfile.name : displayName}
+          </span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56 bg-gray-900 border-gray-700" align="end" forceMount>
