@@ -39,6 +39,7 @@ export function RHFDateField({
             <Button
               type="button"
               onClick={() => setOpen((v) => !v)}
+              tabIndex={0}
               className={cn(
                 "w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background",
                 !field.value && "text-muted-foreground",
