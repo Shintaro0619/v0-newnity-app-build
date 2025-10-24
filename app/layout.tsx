@@ -41,19 +41,39 @@ export default function RootLayout({
                 if (typeof window !== 'undefined') {
                   console.log('[v0] Layout script loaded');
                   
-                  // Polyfill process object
                   if (typeof window.process === 'undefined') {
                     window.process = {
                       env: {},
                       version: 'v18.0.0',
                       versions: {},
                       platform: 'browser',
-                      emitWarning: function() { return undefined; },
-                      nextTick: function(callback) { setTimeout(callback, 0); }
+                      // Proper emitWarning implementation that handles all call patterns
+                      emitWarning: function emitWarning(warning, type, code, ctor) {
+                        // Silently ignore all warnings in browser environment
+                        return undefined;
+                      },
+                      nextTick: function(callback) { 
+                        setTimeout(callback, 0); 
+                      },
+                      // Add EventEmitter-like methods
+                      on: function() { return this; },
+                      once: function() { return this; },
+                      off: function() { return this; },
+                      emit: function() { return false; },
+                      removeListener: function() { return this; },
+                      removeAllListeners: function() { return this; },
+                      listeners: function() { return []; }
                     };
                   } else {
+                    // Ensure emitWarning exists and is properly bound
                     if (typeof window.process.emitWarning !== 'function') {
-                      window.process.emitWarning = function() { return undefined; };
+                      window.process.emitWarning = function emitWarning(warning, type, code, ctor) {
+                        return undefined;
+                      };
+                    }
+                    // Add missing EventEmitter methods if needed
+                    if (typeof window.process.emit !== 'function') {
+                      window.process.emit = function() { return false; };
                     }
                   }
                   
@@ -76,6 +96,8 @@ export default function RootLayout({
                       errorString.includes('Cannot read properties of undefined') ||
                       errorString.includes('reading \\'apply\\'') ||
                       errorString.includes('.apply') ||
+                      errorString.includes('_.emit') ||
+                      errorString.includes('i.pulse') ||
                       errorStack.includes('walletconnect') ||
                       errorStack.includes('heartbeat') ||
                       errorStack.includes('pino')
@@ -97,6 +119,8 @@ export default function RootLayout({
                       message.includes('reading \\'apply\\'') ||
                       message.includes('.apply') ||
                       message.includes('process.emitWarning') ||
+                      message.includes('_.emit') ||
+                      message.includes('i.pulse') ||
                       stack.includes('walletconnect') ||
                       stack.includes('heartbeat') ||
                       stack.includes('pino') ||
@@ -123,6 +147,8 @@ export default function RootLayout({
                       reason.includes('pulse.walletconnect.org') ||
                       reason.includes('Cannot read properties of undefined') ||
                       reason.includes('.apply') ||
+                      reason.includes('_.emit') ||
+                      reason.includes('i.pulse') ||
                       stack.includes('walletconnect') ||
                       stack.includes('heartbeat')
                     ) {

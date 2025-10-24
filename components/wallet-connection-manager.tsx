@@ -19,7 +19,6 @@ export function WalletConnectionManager() {
       clearProfile()
       try {
         localStorage.removeItem("wagmi.connected")
-        localStorage.removeItem("wc@2:client")
       } catch (error) {
         // Storage not available
       }

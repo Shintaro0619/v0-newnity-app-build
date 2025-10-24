@@ -1,82 +1,52 @@
 "use client"
-import { useState, useMemo } from "react"
+import { useState } from "react"
 import { useAccount, useConnect } from "wagmi"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { useToast } from "@/hooks/use-toast"
-import { cn } from "@/lib/utils"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { base, baseSepolia } from "wagmi/chains"
 
 const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id]
 
-export function WalletConnectButton({ className }: { className?: string }) {
+export function WalletConnectButton() {
   const { isConnected } = useAccount()
-  const { connectors, connectAsync, status } = useConnect()
-  const { toast } = useToast()
+  const { connectors, connect, isPending, error } = useConnect()
   const [open, setOpen] = useState(false)
 
-  const injectedConnector = useMemo(() => connectors.find((c) => c.id === "injected"), [connectors])
-
-  const handleClick = () => {
-    if (injectedConnector) {
-      connectAsync({ connector: injectedConnector })
-      setOpen(false)
-      toast({
-        title: "Wallet Connected",
-        description: `Connected with ${injectedConnector.name}`,
-      })
-      return
-    }
-    // injectedがなければ最初のコネクタ（WalletConnectなど）を使用
-    if (connectors[0]) {
-      connectAsync({ connector: connectors[0] })
-      setOpen(false)
-      toast({
-        title: "Wallet Connected",
-        description: `Connected with ${connectors[0].name}`,
-      })
-    }
-  }
-
-  if (isConnected) {
-    return null
-  }
+  if (isConnected) return null
 
   return (
     <>
       <Button
-        onClick={handleClick}
-        className={cn("bg-white/10 hover:bg-green-600 hover:text-black transition-colors", className)}
-        disabled={status === "pending"}
+        onClick={() => setOpen(true)}
+        disabled={isPending}
+        className="bg-white/10 hover:bg-green-600 hover:text-black transition-colors"
       >
-        {status === "pending" ? "Connecting..." : "Connect Wallet"}
+        {isPending ? "Connecting…" : "Connect Wallet"}
       </Button>
-
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent>
           <DialogHeader>
             <DialogTitle>Select a wallet</DialogTitle>
+            <DialogDescription>Choose a wallet provider to connect to newnity</DialogDescription>
           </DialogHeader>
-
-          <div className="grid gap-2">
-            {connectors.map((connector) => (
+          <div className="space-y-2">
+            {connectors.map((c) => (
               <Button
-                key={connector.id}
-                variant="outline"
-                onClick={() => connectAsync({ connector })}
-                className="justify-start"
-                disabled={status === "pending"}
+                key={c.uid}
+                className="w-full justify-between"
+                disabled={!c.ready || isPending}
+                onClick={() => {
+                  connect({ connector: c })
+                  setOpen(false)
+                }}
               >
-                {connector.name}
+                {c.name}
               </Button>
             ))}
           </div>
+          {error ? <p className="text-sm text-red-500 mt-2">{error.message}</p> : null}
         </DialogContent>
       </Dialog>
     </>
   )
-}
-
-export function subscribeToConnecting(listener: (isConnecting: boolean) => void) {
-  return () => {}
 }

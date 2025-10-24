@@ -29,7 +29,7 @@ export function Navbar() {
   const [searchQuery, setSearchQuery] = useState("")
   const [showMobileSearch, setShowMobileSearch] = useState(false)
   const router = useRouter()
-  const { isConnected, address } = useAccount()
+  const { isConnected } = useAccount()
   const mounted = useMounted()
 
   const handleSearch = (e: React.FormEvent) => {

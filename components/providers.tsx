@@ -1,10 +1,11 @@
 "use client"
 
 import type React from "react"
-import { useEffect, useRef, useMemo, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query"
 import { WagmiProvider } from "wagmi"
-import { makeWagmiConfig } from "@/lib/wagmi-config"
+import { config } from "@/lib/wagmi-config"
+import { disconnect } from "@wagmi/core"
 import { AutoDisconnectOnLoad } from "@/components/auto-disconnect-on-load"
 
 function ErrorSuppressor() {
@@ -172,7 +173,16 @@ function ErrorSuppressor() {
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient())
-  const config = useMemo(() => makeWagmiConfig(), [])
+
+  useEffect(() => {
+    // Force fresh start if environment variable is set
+    if (process.env.NEXT_PUBLIC_FORCE_FRESH === "1") {
+      disconnect(config).catch(() => {})
+      try {
+        localStorage.removeItem("newnity_profile")
+      } catch {}
+    }
+  }, [])
 
   return (
     <WagmiProvider config={config}>
