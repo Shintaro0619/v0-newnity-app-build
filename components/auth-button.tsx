@@ -14,34 +14,31 @@ import {
 import { User, LayoutDashboard, Settings, LogOut } from "lucide-react"
 import Link from "next/link"
 import { getUserProfile } from "@/app/settings/actions"
+import { useProfileStore } from "@/lib/stores/profile"
 
 export function AuthButton() {
   const { address, isConnected } = useAccount()
   const { disconnect } = useDisconnect()
-  const [userProfile, setUserProfile] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [currentAddress, setCurrentAddress] = useState<string | undefined>(undefined)
 
+  const userProfile = useProfileStore((state) => state.profile)
+  const setUserProfile = useProfileStore((state) => state.setProfile)
+  const clearProfile = useProfileStore((state) => state.clear)
+
   useEffect(() => {
     if (!isConnected || !address) {
-      setUserProfile(null)
+      clearProfile()
       setCurrentAddress(undefined)
-      // localStorageから古いプロフィール情報を削除
-      try {
-        localStorage.removeItem("profile")
-        localStorage.removeItem("lastAddress")
-      } catch (error) {
-        // localStorage が使えない環境でもエラーにしない
-      }
       return
     }
 
     if (currentAddress && currentAddress !== address) {
-      setUserProfile(null)
+      clearProfile()
     }
 
     setCurrentAddress(address)
-  }, [address, isConnected, currentAddress])
+  }, [address, isConnected, currentAddress, clearProfile])
 
   useEffect(() => {
     if (!isConnected || !address) {
@@ -67,7 +64,7 @@ export function AuthButton() {
     }
 
     loadProfile()
-  }, [address, isConnected])
+  }, [address, isConnected, setUserProfile])
 
   if (!isConnected || !address) {
     return null
@@ -78,14 +75,8 @@ export function AuthButton() {
   const showProfile = profileMatches && !isLoading
 
   const handleDisconnect = () => {
-    setUserProfile(null)
+    clearProfile()
     setCurrentAddress(undefined)
-    try {
-      localStorage.removeItem("profile")
-      localStorage.removeItem("lastAddress")
-    } catch (error) {
-      // localStorage が使えない環境でもエラーにしない
-    }
     disconnect()
   }
 

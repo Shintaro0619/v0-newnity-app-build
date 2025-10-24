@@ -5,6 +5,11 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
 import { cn } from "@/lib/utils"
+import { switchChain } from "wagmi/actions"
+import { config } from "@/lib/wagmi-config"
+import { base, baseSepolia } from "wagmi/chains"
+
+const SUPPORTED_CHAIN_IDS = [base.id, baseSepolia.id]
 
 export function WalletConnectButton({ className }: { className?: string }) {
   const { isConnected } = useAccount()
@@ -14,6 +19,37 @@ export function WalletConnectButton({ className }: { className?: string }) {
 
   if (isConnected) {
     return null
+  }
+
+  const handleConnect = async (connector: any) => {
+    const targetChainId = SUPPORTED_CHAIN_IDS[0]
+
+    try {
+      // Try to switch chain before connecting
+      try {
+        await switchChain(config, { chainId: targetChainId })
+      } catch (switchError) {
+        console.warn("[v0] Chain switch rejected before connection:", switchError)
+        // If user rejects chain switch, don't proceed with connection
+        return
+      }
+
+      await connectAsync({ connector, chainId: targetChainId })
+      setOpen(false)
+      toast({
+        title: "Wallet Connected",
+        description: `Connected with ${connector.name}`,
+      })
+    } catch (error) {
+      console.error("[v0] Connection error:", error)
+      if (error instanceof Error && !error.message.includes("rejected")) {
+        toast({
+          title: "Connection Failed",
+          description: error.message || "Failed to connect wallet",
+          variant: "destructive",
+        })
+      }
+    }
   }
 
   return (
@@ -37,26 +73,7 @@ export function WalletConnectButton({ className }: { className?: string }) {
               <Button
                 key={connector.id}
                 variant="outline"
-                onClick={async () => {
-                  console.log("[v0] Wallet connector selected:", connector.name)
-                  try {
-                    await connectAsync({ connector })
-                    setOpen(false)
-                    toast({
-                      title: "Wallet Connected",
-                      description: `Connected with ${connector.name}`,
-                    })
-                  } catch (error) {
-                    console.error("[v0] Connection error:", error)
-                    if (error instanceof Error && !error.message.includes("rejected")) {
-                      toast({
-                        title: "Connection Failed",
-                        description: error.message || "Failed to connect wallet",
-                        variant: "destructive",
-                      })
-                    }
-                  }
-                }}
+                onClick={() => handleConnect(connector)}
                 className="justify-start"
                 disabled={status === "pending"}
               >

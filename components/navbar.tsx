@@ -11,6 +11,7 @@ import dynamic from "next/dynamic"
 import { AuthButton } from "@/components/auth-button"
 import { useAccount } from "wagmi"
 import { useMounted } from "@/hooks/use-mounted"
+import { WalletConnectionManager } from "@/components/wallet-connection-manager"
 
 const WalletConnectButton = dynamic(
   () => import("@/components/wallet-connect-button").then((mod) => ({ default: mod.WalletConnectButton })),
@@ -149,6 +150,8 @@ export function Navbar() {
           </div>
         </div>
       )}
+
+      <WalletConnectionManager />
     </nav>
   )
 }
