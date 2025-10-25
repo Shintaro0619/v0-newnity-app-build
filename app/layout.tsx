@@ -7,6 +7,7 @@ import { Navbar } from "@/components/navbar"
 import { SiteFooter } from "@/components/site-footer"
 import WalletConnectionManager from "@/components/web3/wallet-connection-manager"
 import SessionWalletReset from "@/app/providers/SessionWalletReset"
+import { WalletExtensionMonitor } from "@/components/wallet-extension-monitor"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -99,9 +100,9 @@ export default function RootLayout({
                       errorString.includes('.apply') ||
                       errorString.includes('_.emit') ||
                       errorString.includes('i.pulse') ||
-                      errorStack.includes('walletconnect') ||
-                      errorStack.includes('heartbeat') ||
-                      errorStack.includes('pino')
+                      stack.includes('walletconnect') ||
+                      stack.includes('heartbeat') ||
+                      stack.includes('pino')
                     ) {
                       return;
                     }
@@ -166,6 +167,7 @@ export default function RootLayout({
       <body className={`font-sans ${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         <Providers>
           <SessionWalletReset />
+          <WalletExtensionMonitor />
           <WalletConnectionManager />
           <Navbar />
           {children}
