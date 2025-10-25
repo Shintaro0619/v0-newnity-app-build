@@ -7,11 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { RichEditor } from "@/components/ui/rich-editor"
-import { DatePicker } from "@/components/ui/date-picker"
-import { Alert } from "@/components/ui/alert"
-import { Save, ArrowLeft, Trash2 } from "lucide-react"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
+import { MediaUpload } from "@/components/ui/media-upload"
+import { Save, ArrowLeft, Trash2, ImageIcon, Target, Users, CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Calendar } from "@/components/ui/calendar"
+import { cn } from "@/lib/utils" // Fixed import: cn should be imported from @/lib/utils
 
 interface RewardTier {
   id: string
@@ -83,10 +89,10 @@ export default function EditCampaignPage() {
   const [activeTab, setActiveTab] = useState("basic")
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [galleryFiles, setGalleryFiles] = useState<(File | string)[]>([])
+  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
 
-  const handleMediaError = useCallback((error: string) => {
-    setErrors((prev) => ({ ...prev, media: error }))
-  }, [])
+  useEffect(() => setMounted(true), [])
 
   useEffect(() => {
     const fetchCampaign = async () => {
@@ -381,10 +387,20 @@ export default function EditCampaignPage() {
     onUpdate: (tier: RewardTier) => void
     onDelete: () => void
   }) => {
+    const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
+    const [localQuantity, setLocalQuantity] = useState<string>(tier.quantity?.toString() ?? "")
+
+    const handleQuantityBlur = () => {
+      const numValue = localQuantity === "" ? null : Number(localQuantity)
+      if (numValue !== tier.quantity) {
+        onUpdate({ ...tier, quantity: numValue })
+      }
+    }
+
     return (
       <Card className="border-2 border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-lg">Reward Tier</CardTitle>
+          <CardTitle className="text-lg">Reward Tier {index + 1}</CardTitle>
           <Button variant="ghost" size="sm" onClick={onDelete}>
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -428,11 +444,28 @@ export default function EditCampaignPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Delivery</Label>
-              <DatePicker
-                value={tier.deliveryDate}
-                onChange={(d) => onUpdate({ ...tier, deliveryDate: d })}
-                placeholder="Pick a date"
-              />
+              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={tier.deliveryDate}
+                    onSelect={(date) => {
+                      onUpdate({ ...tier, deliveryDate: date })
+                      if (date) setIsDeliveryDateOpen(false)
+                    }}
+                    disabled={(date) => date < new Date()}
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div className="space-y-2">
               <Label className="text-base font-semibold">Limited Quantity</Label>
@@ -446,21 +479,28 @@ export default function EditCampaignPage() {
                   {tier.isLimited ? "✓ Limited quantity enabled" : "Enable limited quantity"}
                 </Label>
               </div>
-              {tier.isLimited && (
-                <Input
-                  type="number"
-                  value={tier.quantity || ""}
-                  onChange={(e) => onUpdate({ ...tier, quantity: Number(e.target.value) || null })}
-                  placeholder="100"
-                  className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                />
-              )}
+              <Input
+                type="number"
+                disabled={!tier.isLimited}
+                className={cn(
+                  "border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background",
+                  !tier.isLimited && "opacity-50",
+                )}
+                value={localQuantity}
+                onChange={(e) => setLocalQuantity(e.target.value)}
+                onBlur={handleQuantityBlur}
+                placeholder="100"
+              />
             </div>
           </div>
         </CardContent>
       </Card>
     )
   }
+
+  const handleMediaError = useCallback((error: string) => {
+    setErrors((prev) => ({ ...prev, media: error }))
+  }, [])
 
   if (loading) {
     return (
@@ -517,38 +557,333 @@ export default function EditCampaignPage() {
 
           {errors.submit && (
             <Alert className="border-2 border-destructive bg-destructive/10">
-              <p className="text-sm font-semibold text-destructive">{errors.submit}</p>
+              <AlertTitle>Error</AlertTitle>
+              <AlertDescription>{errors.submit}</AlertDescription>
             </Alert>
           )}
 
           {/* Main Content */}
           <div className="space-y-6">
-            <Card className="border-2 border-primary/20">
-              <CardHeader>
-                <CardTitle>Funding Goals</CardTitle>
-                <CardDescription>Update your funding target and timeline</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="endDate">Campaign End Date *</Label>
-                    <DatePicker
-                      value={campaignData.funding.endDate}
-                      onChange={(d) =>
-                        setCampaignData((prev) => {
-                          if (!prev) return prev
-                          return {
-                            ...prev,
-                            funding: { ...prev.funding, endDate: d },
+            {mounted ? (
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
+                  <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                  <TabsTrigger value="media">Media</TabsTrigger>
+                  <TabsTrigger value="funding">Funding</TabsTrigger>
+                  <TabsTrigger value="tiers">Reward Tiers</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="basic" forceMount className="space-y-6">
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <span className="text-2xl">📄</span>
+                        Campaign Details
+                      </CardTitle>
+                      <CardDescription>Tell us about your project</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="space-y-2">
+                        <Label htmlFor="title">Campaign Title *</Label>
+                        <Input
+                          id="title"
+                          value={campaignData?.basic.title || ""}
+                          onChange={(e) =>
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                basic: { ...prev.basic, title: e.target.value },
+                              }
+                            })
                           }
-                        })
-                      }
-                      placeholder="Pick an end date"
-                    />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                          placeholder="Revolutionary VR Headset for Everyone"
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="subtitle">Subtitle *</Label>
+                        <Input
+                          id="subtitle"
+                          value={campaignData?.basic.subtitle || ""}
+                          onChange={(e) =>
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                basic: { ...prev.basic, subtitle: e.target.value },
+                              }
+                            })
+                          }
+                          placeholder="Immersive virtual reality at an affordable price"
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="description">Campaign Description *</Label>
+                        <RichEditor
+                          content={campaignData?.basic.description || ""}
+                          onChange={(content) =>
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                basic: { ...prev.basic, description: content },
+                              }
+                            })
+                          }
+                          placeholder="Tell your story..."
+                          className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="category">Category *</Label>
+                          <Select
+                            value={campaignData?.basic.category || ""}
+                            onValueChange={(value) =>
+                              setCampaignData((prev) => {
+                                if (!prev) return prev
+                                return {
+                                  ...prev,
+                                  basic: { ...prev.basic, category: value },
+                                }
+                              })
+                            }
+                          >
+                            <SelectTrigger className="border-2 border-border bg-zinc-800">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {categories.map((category) => (
+                                <SelectItem key={category} value={category.toLowerCase()}>
+                                  {category}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="tags">Tags (comma separated)</Label>
+                          <Input
+                            id="tags"
+                            value={campaignData?.basic.tags.join(", ") || ""}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              setCampaignData((prev) => {
+                                if (!prev) return prev
+                                return {
+                                  ...prev,
+                                  basic: {
+                                    ...prev.basic,
+                                    tags: value ? [value] : [],
+                                  },
+                                }
+                              })
+                            }}
+                            onBlur={(e) => {
+                              const value = e.target.value
+                              const tags = value
+                                .split(",")
+                                .map((tag) => tag.trim())
+                                .filter(Boolean)
+                              setCampaignData((prev) => {
+                                if (!prev) return prev
+                                return {
+                                  ...prev,
+                                  basic: { ...prev.basic, tags },
+                                }
+                              })
+                            }}
+                            placeholder="VR, Gaming, Technology"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="media" forceMount className="space-y-6">
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ImageIcon className="h-5 w-5" />
+                        Campaign Media
+                      </CardTitle>
+                      <CardDescription>Upload images and add video to showcase your campaign</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-8">
+                      <MediaUpload
+                        type="image"
+                        title="Main Campaign Image *"
+                        description="This will be the primary image shown on your campaign page"
+                        maxSize={10 * 1024 * 1024}
+                        enableCompression={true}
+                        showPreview={true}
+                        initialFiles={campaignData?.media.mainImageUrl ? [campaignData.media.mainImageUrl] : []}
+                        onFilesChange={handleMainImageChange}
+                        onError={handleMediaError}
+                      />
+
+                      <MediaUpload
+                        type="image"
+                        title="Gallery Images"
+                        description="Additional images to showcase your project (optional)"
+                        multiple={true}
+                        maxFiles={8}
+                        maxSize={10 * 1024 * 1024}
+                        enableCompression={true}
+                        showPreview={true}
+                        initialFiles={campaignData?.media.galleryUrls || []}
+                        onFilesChange={handleGalleryChange}
+                        onError={handleMediaError}
+                      />
+
+                      <div className="space-y-2">
+                        <Label htmlFor="youtubeUrl">YouTube URL</Label>
+                        <Input
+                          id="youtubeUrl"
+                          type="url"
+                          value={campaignData?.media.youtubeUrl || ""}
+                          onChange={(e) =>
+                            setCampaignData((prev) => {
+                              if (!prev) return prev
+                              return {
+                                ...prev,
+                                media: { ...prev.media, youtubeUrl: e.target.value },
+                              }
+                            })
+                          }
+                          placeholder="https://www.youtube.com/watch?v=..."
+                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="funding" forceMount className="space-y-6">
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Target className="h-5 w-5" />
+                        Funding Goals
+                      </CardTitle>
+                      <CardDescription>Update your funding target and timeline</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="goal">Funding Goal (USDC) *</Label>
+                          <Input
+                            id="goal"
+                            type="number"
+                            value={campaignData?.funding.goal || ""}
+                            onChange={(e) =>
+                              setCampaignData((prev) => {
+                                if (!prev) return prev
+                                return {
+                                  ...prev,
+                                  funding: { ...prev.funding, goal: Number(e.target.value) },
+                                }
+                              })
+                            }
+                            placeholder="50000"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="endDate">Campaign End Date *</Label>
+                          <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
+                            <PopoverTrigger asChild>
+                              <Button
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {campaignData?.funding.endDate ? (
+                                  format(campaignData.funding.endDate, "PPP")
+                                ) : (
+                                  <span className="text-muted-foreground">Pick an end date</span>
+                                )}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={campaignData?.funding.endDate}
+                                onSelect={(date) => {
+                                  setCampaignData((prev) => {
+                                    if (!prev) return prev
+                                    return {
+                                      ...prev,
+                                      funding: { ...prev.funding, endDate: date },
+                                    }
+                                  })
+                                  if (date) setIsEndDateOpen(false)
+                                }}
+                                disabled={(date) => date < new Date()}
+                              />
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                <TabsContent value="tiers" forceMount className="space-y-6">
+                  <Card className="border-2 border-primary/20">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="flex items-center gap-2">
+                            <Users className="h-5 w-5" />
+                            Reward Tiers
+                          </CardTitle>
+                          <CardDescription>Create reward tiers for your backers</CardDescription>
+                        </div>
+                        <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
+                          Add Tier
+                        </Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-6">
+                      {campaignData?.rewards.map((tier, index) => (
+                        <RewardTierCard
+                          key={tier.id}
+                          tier={tier}
+                          index={index}
+                          onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
+                          onDelete={() => deleteRewardTier(index)}
+                        />
+                      ))}
+
+                      {campaignData?.rewards.length === 0 && (
+                        <Card className="border-dashed border-2">
+                          <CardContent className="pt-6 text-center">
+                            <span className="text-6xl mb-4 block">🎁</span>
+                            <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
+                            <p className="text-muted-foreground mb-4">
+                              Create reward tiers to incentivize backers and offer value for their support.
+                            </p>
+                            <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
+                              Create Your First Tier
+                            </Button>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            ) : null}
           </div>
         </div>
       </div>
