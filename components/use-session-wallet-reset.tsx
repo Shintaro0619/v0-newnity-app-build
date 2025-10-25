@@ -7,6 +7,7 @@ import { config } from "@/lib/wagmi-config"
 export function UseSessionWalletReset() {
   useEffect(() => {
     try {
+      // LocalStorage削除
       const keys = Object.keys(localStorage)
       const targets = keys.filter(
         (k) =>
@@ -18,8 +19,13 @@ export function UseSessionWalletReset() {
           k.toLowerCase().includes("walletconnect"),
       )
       targets.forEach((k) => localStorage.removeItem(k))
-      sessionStorage.setItem("wagmi.lastUsedConnector", "")
 
+      // SessionStorageもクリア
+      sessionStorage.setItem("wagmi.lastUsedConnector", "")
+      sessionStorage.removeItem("wagmi.connected")
+      sessionStorage.removeItem("wagmi.wallet")
+
+      // IndexedDB削除
       const deleteDB = (name: string) => {
         try {
           indexedDB.deleteDatabase(name)
@@ -30,7 +36,11 @@ export function UseSessionWalletReset() {
       deleteDB("walletconnect")
       deleteDB("walletconnect-store")
       deleteDB("WALLETCONNECT_V2_INDEXED_DB")
+      deleteDB("WALLET_CONNECT_V2_INDEXED_DB")
+      deleteDB("walletlink")
+      deleteDB("coinbase-wallet-sdk")
 
+      // 強制切断
       try {
         disconnect(config)
       } catch (e) {
