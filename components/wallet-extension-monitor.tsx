@@ -4,7 +4,7 @@ import { useEffect } from "react"
 import { useAccount, useDisconnect } from "wagmi"
 
 /**
- * ブラウザ拡張機能（MetaMask、Phantom等）の自動接続を監視して、
+ * ブラウザ拡張機能（MetaMask、Phantom、OKX Wallet等）の自動接続を監視して、
  * ユーザーが明示的に接続していない場合は強制的に切断する
  */
 export function WalletExtensionMonitor() {
@@ -27,14 +27,22 @@ export function WalletExtensionMonitor() {
           key.startsWith("rk-") ||
           key.startsWith("walletconnect") ||
           key.includes("metamask") ||
-          key.includes("coinbase")
+          key.includes("coinbase") ||
+          key.includes("okx") ||
+          key.includes("OKX")
         ) {
           localStorage.removeItem(key)
         }
       })
 
       Object.keys(sessionStorage).forEach((key) => {
-        if (key.startsWith("wagmi.") || key.startsWith("wc@2") || key.startsWith("rk-")) {
+        if (
+          key.startsWith("wagmi.") ||
+          key.startsWith("wc@2") ||
+          key.startsWith("rk-") ||
+          key.includes("okx") ||
+          key.includes("OKX")
+        ) {
           sessionStorage.removeItem(key)
         }
       })
