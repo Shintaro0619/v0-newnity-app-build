@@ -27,8 +27,6 @@ const connectors = [
     : []),
 ]
 
-const autoConnect = false
-
 export const wagmiConfig = createConfig({
   chains: [base, baseSepolia],
   transports: {
@@ -40,7 +38,6 @@ export const wagmiConfig = createConfig({
   storage: createStorage({
     storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
   }),
-  autoConnect,
 })
 
 export const config = wagmiConfig
