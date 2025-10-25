@@ -788,7 +788,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   </div>
                 )}
 
-                {campaign.status === "ACTIVE" && blockchainId && (
+                {blockchainId && campaign.status !== "SUCCESSFUL" && campaign.status !== "FAILED" && (
                   <>
                     {hasDeadlinePassed && !isBlockchainFinalized ? (
                       // Enhanced action buttons with manual refresh
@@ -855,7 +855,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   </>
                 )}
 
-                {campaign.status === "DRAFT" && !blockchainId && isCreator && (
+                {!blockchainId && isCreator && (
                   <div className="space-y-4">
                     <div className="p-4 bg-yellow-50 dark:bg-yellow-950 border border-yellow-200 dark:border-yellow-800 rounded-lg text-sm">
                       <p className="font-medium text-yellow-900 dark:text-yellow-100 mb-2">⚠️ Campaign Not Deployed</p>
@@ -874,7 +874,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                   </div>
                 )}
 
-                {campaign.status === "DRAFT" && !blockchainId && !isCreator && (
+                {!blockchainId && !isCreator && (
                   <div className="p-4 bg-muted rounded-lg text-sm text-muted-foreground text-center">
                     This campaign is not yet deployed on the blockchain. Pledging will be available once the creator
                     deploys it.
