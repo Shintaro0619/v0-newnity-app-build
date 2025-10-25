@@ -7,17 +7,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
 import { RichEditor } from "@/components/ui/rich-editor"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Alert } from "@/components/ui/alert"
-import { format } from "date-fns"
-import { MediaUpload } from "@/components/ui/media-upload"
-import { Save, ArrowLeft, CalendarIcon, Plus, Trash2, DollarSign } from "lucide-react"
+import { Save, ArrowLeft, Trash2 } from "lucide-react"
 
 interface RewardTier {
   id: string
@@ -86,7 +80,6 @@ export default function EditCampaignPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [isEndDateOpen, setIsEndDateOpen] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [galleryFiles, setGalleryFiles] = useState<(File | string)[]>([])
@@ -388,8 +381,6 @@ export default function EditCampaignPage() {
     onUpdate: (tier: RewardTier) => void
     onDelete: () => void
   }) => {
-    const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
-
     return (
       <Card className="border-2 border-border">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -437,31 +428,11 @@ export default function EditCampaignPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Delivery</Label>
-              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal bg-zinc-800 border-2 border-border hover:bg-background"
-                  >
-                    <span className="mr-2">📅</span>
-                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={tier.deliveryDate}
-                    onSelect={(date) => {
-                      onUpdate({ ...tier, deliveryDate: date })
-                      if (date) {
-                        setIsDeliveryDateOpen(false)
-                      }
-                    }}
-                    disabled={(date) => date < new Date()}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <DatePicker
+                value={tier.deliveryDate}
+                onChange={(d) => onUpdate({ ...tier, deliveryDate: d })}
+                placeholder="Pick a date"
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-base font-semibold">Limited Quantity</Label>
@@ -551,398 +522,34 @@ export default function EditCampaignPage() {
           )}
 
           {/* Main Content */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
-              <TabsTrigger
-                value="basic"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Basic Info
-              </TabsTrigger>
-              <TabsTrigger
-                value="media"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Media
-              </TabsTrigger>
-              <TabsTrigger
-                value="funding"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Funding
-              </TabsTrigger>
-              <TabsTrigger
-                value="tiers"
-                className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-              >
-                Reward Tiers
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="basic" className="space-y-6">
-              <Card className="border-2 border-primary/20">
-                <CardHeader>
-                  <CardTitle>Campaign Details</CardTitle>
-                  <CardDescription>Update your project information</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
+          <div className="space-y-6">
+            <Card className="border-2 border-primary/20">
+              <CardHeader>
+                <CardTitle>Funding Goals</CardTitle>
+                <CardDescription>Update your funding target and timeline</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="title">Campaign Title *</Label>
-                    <Input
-                      id="title"
-                      value={campaignData.basic.title}
-                      onChange={(e) =>
+                    <Label htmlFor="endDate">Campaign End Date *</Label>
+                    <DatePicker
+                      value={campaignData.funding.endDate}
+                      onChange={(d) =>
                         setCampaignData((prev) => {
                           if (!prev) return prev
                           return {
                             ...prev,
-                            basic: { ...prev.basic, title: e.target.value },
+                            funding: { ...prev.funding, endDate: d },
                           }
                         })
                       }
-                      className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                      placeholder="Pick an end date"
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="subtitle">Subtitle *</Label>
-                    <Input
-                      id="subtitle"
-                      value={campaignData.basic.subtitle}
-                      onChange={(e) =>
-                        setCampaignData((prev) => {
-                          if (!prev) return prev
-                          return {
-                            ...prev,
-                            basic: { ...prev.basic, subtitle: e.target.value },
-                          }
-                        })
-                      }
-                      className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="description">Campaign Description *</Label>
-                    <RichEditor
-                      content={campaignData.basic.description}
-                      onChange={(content) =>
-                        setCampaignData((prev) => {
-                          if (!prev) return prev
-                          return {
-                            ...prev,
-                            basic: { ...prev.basic, description: content },
-                          }
-                        })
-                      }
-                      className="min-h-[120px] border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="category">Category *</Label>
-                      <Select
-                        value={campaignData.basic.category}
-                        onValueChange={(value) =>
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              basic: { ...prev.basic, category: value },
-                            }
-                          })
-                        }
-                      >
-                        <SelectTrigger className="border-2 border-border bg-zinc-800">
-                          <SelectValue placeholder="Select a category" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category} value={category.toLowerCase()}>
-                              {category}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="tags">Tags (comma separated)</Label>
-                      <Input
-                        id="tags"
-                        value={campaignData.basic.tags.join(", ")}
-                        onChange={(e) => {
-                          const value = e.target.value
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              basic: {
-                                ...prev.basic,
-                                tags: value ? [value] : [],
-                              },
-                            }
-                          })
-                        }}
-                        onBlur={(e) => {
-                          const value = e.target.value
-                          const tags = value
-                            .split(",")
-                            .map((tag) => tag.trim())
-                            .filter(Boolean)
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              basic: { ...prev.basic, tags },
-                            }
-                          })
-                        }}
-                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                      />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="media" className="space-y-6">
-              <Card className="border-2 border-primary/20">
-                <CardHeader>
-                  <CardTitle>Campaign Media</CardTitle>
-                  <CardDescription>Upload images and add video to showcase your campaign</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-8">
-                  <MediaUpload
-                    type="image"
-                    title="Main Campaign Image *"
-                    description="This will be the primary image shown on your campaign page"
-                    maxSize={10 * 1024 * 1024}
-                    enableCompression={true}
-                    showPreview={true}
-                    initialFiles={campaignData.media.mainImageUrl ? [campaignData.media.mainImageUrl] : []}
-                    onFilesChange={handleMainImageChange}
-                    onError={handleMediaError}
-                  />
-
-                  <Separator />
-
-                  <MediaUpload
-                    type="image"
-                    title="Gallery Images"
-                    description="Additional images to showcase your project (optional)"
-                    multiple={true}
-                    maxFiles={8}
-                    maxSize={10 * 1024 * 1024}
-                    enableCompression={true}
-                    showPreview={true}
-                    initialFiles={campaignData.media.galleryUrls}
-                    onFilesChange={handleGalleryChange}
-                    onError={handleMediaError}
-                  />
-
-                  <Separator />
-
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="youtubeUrl" className="text-base font-semibold">
-                        Campaign Video (YouTube)
-                      </Label>
-                      <p className="text-sm text-muted-foreground">Add a YouTube video to showcase your campaign</p>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="youtubeUrl">YouTube URL</Label>
-                      <Input
-                        id="youtubeUrl"
-                        type="url"
-                        value={campaignData.media.youtubeUrl}
-                        onChange={(e) =>
-                          setCampaignData((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...prev,
-                              media: { ...prev.media, youtubeUrl: e.target.value },
-                            }
-                          })
-                        }
-                        placeholder="https://www.youtube.com/watch?v=..."
-                        className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                      />
-                    </div>
-
-                    {campaignData.media.youtubeUrl && (
-                      <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                        <iframe
-                          src={(() => {
-                            const url = campaignData.media.youtubeUrl
-                            const patterns = [
-                              /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-                              /youtube\.com\/shorts\/([^&\n?#]+)/,
-                            ]
-                            for (const pattern of patterns) {
-                              const match = url.match(pattern)
-                              if (match && match[1]) {
-                                return `https://www.youtube.com/embed/${match[1]}`
-                              }
-                            }
-                            return ""
-                          })()}
-                          title="Campaign video preview"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                          allowFullScreen
-                          className="w-full h-full"
-                        />
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="funding" className="space-y-6">
-              <Card className="border-2 border-primary/20">
-                <CardHeader>
-                  <CardTitle>Funding Goals</CardTitle>
-                  <CardDescription>Update your funding target and timeline</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="goal">Funding Goal (USDC) *</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="goal"
-                          type="number"
-                          value={campaignData.funding.goal === 0 ? "" : campaignData.funding.goal}
-                          onChange={(e) => {
-                            const value = e.target.value === "" ? 0 : Number(e.target.value)
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                funding: { ...prev.funding, goal: value },
-                              }
-                            })
-                          }}
-                          placeholder="50000"
-                          className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="endDate">Campaign End Date *</Label>
-                      <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {campaignData.funding.endDate ? (
-                              format(campaignData.funding.endDate, "PPP")
-                            ) : (
-                              <span className="text-muted-foreground">Pick an end date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={campaignData.funding.endDate}
-                            onSelect={(date) => {
-                              setCampaignData((prev) => {
-                                if (!prev) return prev
-                                return {
-                                  ...prev,
-                                  funding: { ...prev.funding, endDate: date },
-                                }
-                              })
-                              if (date) {
-                                setIsEndDateOpen(false)
-                              }
-                            }}
-                            disabled={(date) => date < new Date()}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="minPledge">Minimum Pledge (USDC)</Label>
-                      <div className="relative">
-                        <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="minPledge"
-                          type="number"
-                          value={campaignData.funding.minPledge === 0 ? "" : campaignData.funding.minPledge}
-                          onChange={(e) => {
-                            const value = e.target.value === "" ? 0 : Number(e.target.value)
-                            setCampaignData((prev) => {
-                              if (!prev) return prev
-                              return {
-                                ...prev,
-                                funding: { ...prev.funding, minPledge: value },
-                              }
-                            })
-                          }}
-                          placeholder="1"
-                          className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            <TabsContent value="tiers" className="space-y-6">
-              <Card className="border-2 border-primary/20">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg">Reward Tiers</CardTitle>
-                      <CardDescription>Manage reward tiers for your backers</CardDescription>
-                    </div>
-                    <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Tier
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                  <div className="space-y-6">
-                    {campaignData.rewards.map((tier, index) => (
-                      <RewardTierCard
-                        key={tier.id}
-                        tier={tier}
-                        index={index}
-                        onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
-                        onDelete={() => deleteRewardTier(index)}
-                      />
-                    ))}
-
-                    {campaignData.rewards.length === 0 && (
-                      <Card className="border-dashed border-2">
-                        <CardContent className="pt-6 text-center">
-                          <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
-                          <p className="text-muted-foreground mb-4">Create reward tiers to incentivize backers</p>
-                          <Button onClick={addRewardTier} className="bg-primary hover:bg-primary/90">
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create Your First Tier
-                          </Button>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </div>
     </div>

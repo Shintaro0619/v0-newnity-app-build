@@ -7,6 +7,7 @@ import { Navbar } from "@/components/navbar"
 import { SiteFooter } from "@/components/site-footer"
 import WalletConnectionManager from "@/components/web3/wallet-connection-manager"
 import SessionWalletReset from "@/app/providers/SessionWalletReset"
+import { DisconnectOnUnload } from "@/components/DisconnectOnUnload"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -165,6 +166,7 @@ export default function RootLayout({
       </head>
       <body className={`font-sans ${inter.variable} ${spaceGrotesk.variable} antialiased`}>
         <Providers>
+          <DisconnectOnUnload />
           <SessionWalletReset />
           <WalletConnectionManager />
           <Navbar />

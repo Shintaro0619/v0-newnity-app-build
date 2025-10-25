@@ -27,9 +27,7 @@ const connectors = [
     : []),
 ]
 
-const AUTO = typeof window !== "undefined" && localStorage.getItem("newnity:autoconnect") === "1"
-
-const autoConnect = process.env.NEXT_PUBLIC_WALLET_AUTOCONNECT === "1" ? true : AUTO
+const autoConnect = false
 
 export const wagmiConfig = createConfig({
   chains: [base, baseSepolia],
