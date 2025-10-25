@@ -63,7 +63,7 @@ interface CampaignData {
   funding: {
     goal: number
     endDate: Date | undefined
-    currency: string
+    currency: "USD" | "USDC" // Explicitly define currency type
     minPledge: number
   }
   rewards: RewardTier[]
@@ -120,7 +120,7 @@ const initialCampaignData: CampaignData = {
   funding: {
     goal: 0,
     endDate: undefined,
-    currency: "USD",
+    currency: "USDC", // Default to USDC
     minPledge: 0,
   },
   rewards: [],
@@ -175,6 +175,7 @@ export default function CreateCampaignPage() {
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isEndDateOpen, setIsEndDateOpen] = useState(false) // Keep for direct Popover usage
+  const [showEndCalendar, setShowEndCalendar] = useState(false) // Fundingカレンダー用のインライン表示フラグを追加
   const [activeTab, setActiveTab] = useState("basic")
   const tierRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const setTierRef = (id: string) => (el: HTMLDivElement | null) => {
@@ -1166,43 +1167,47 @@ export default function CreateCampaignPage() {
 
                           <div className="space-y-2">
                             <Label htmlFor="endDate">Campaign End Date *</Label>
-                            <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen} modal={false}>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={() => setIsEndDateOpen((v) => !v)}
-                                  className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
-                                >
-                                  <CalendarIcon className="mr-2 h-4 w-4" />
-                                  {campaignData.funding.endDate ? (
-                                    format(campaignData.funding.endDate, "PPP")
-                                  ) : (
-                                    <span className="text-muted-foreground">Pick an end date</span>
-                                  )}
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0 z-[60]" align="start" forceMount>
-                                <Calendar
-                                  mode="single"
-                                  selected={campaignData.funding.endDate}
-                                  onSelect={(date) => {
-                                    setCampaignData((prev) => ({
-                                      ...prev,
-                                      funding: { ...prev.funding, endDate: date },
-                                    }))
-                                    if (date) {
-                                      setIsEndDateOpen(false)
-                                      setErrors((prev) => {
-                                        const { endDate, ...rest } = prev
-                                        return rest
-                                      })
-                                    }
-                                  }}
-                                  disabled={(date) => date < new Date()}
-                                />
-                              </PopoverContent>
-                            </Popover>
+                            <div className="relative">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
+                                data-e2e="funding-enddate-trigger"
+                                onClick={() => setShowEndCalendar((v) => !v)}
+                              >
+                                <CalendarIcon className="mr-2 h-4 w-4" />
+                                {campaignData.funding.endDate ? (
+                                  format(campaignData.funding.endDate, "PPP")
+                                ) : (
+                                  <span className="text-muted-foreground">Pick an end date</span>
+                                )}
+                              </Button>
+
+                              {showEndCalendar && (
+                                <div className="absolute z-[70] mt-2">
+                                  <Card className="p-2">
+                                    <Calendar
+                                      mode="single"
+                                      selected={campaignData.funding.endDate}
+                                      onSelect={(date) => {
+                                        setCampaignData((prev) => ({
+                                          ...prev,
+                                          funding: { ...prev.funding, endDate: date },
+                                        }))
+                                        if (date) {
+                                          setShowEndCalendar(false)
+                                          setErrors((prev) => {
+                                            const { endDate, ...rest } = prev
+                                            return rest
+                                          })
+                                        }
+                                      }}
+                                      disabled={(date) => date < new Date()}
+                                    />
+                                  </Card>
+                                </div>
+                              )}
+                            </div>
                             {errors.endDate && (
                               <p className="text-sm font-semibold text-destructive">{errors.endDate}</p>
                             )}
@@ -1357,8 +1362,14 @@ export default function CreateCampaignPage() {
                     </div>
                     <div className="flex justify-between">
                       <span>Media</span>
-                      <span className={campaignData.media.mainImage ? "text-green-500" : "text-muted-foreground"}>
-                        {campaignData.media.mainImage ? "✓" : "○"}
+                      <span
+                        className={
+                          campaignData.media.mainImage || campaignData.media.mainImageUrl
+                            ? "text-green-500"
+                            : "text-muted-foreground"
+                        }
+                      >
+                        {campaignData.media.mainImage || campaignData.media.mainImageUrl ? "✓" : "○"}
                       </span>
                     </div>
                     <div className="flex justify-between">

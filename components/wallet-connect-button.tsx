@@ -26,7 +26,16 @@ export function WalletConnectButton() {
         <a className="underline text-sm" href="/settings">
           Edit
         </a>
-        <Button variant="secondary" size="sm" onClick={() => disconnect()}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => {
+            try {
+              sessionStorage.removeItem("newnity_user_clicked_connect")
+            } catch {}
+            disconnect()
+          }}
+        >
           Disconnect
         </Button>
       </div>
@@ -61,6 +70,9 @@ export function WalletConnectButton() {
                 onClick={async () => {
                   try {
                     await connect({ connector: c })
+                    try {
+                      sessionStorage.setItem("newnity_user_clicked_connect", "1")
+                    } catch {}
                     setOpen(false)
                   } catch (e) {
                     console.error("[WalletConnectButton] connect error:", e)
