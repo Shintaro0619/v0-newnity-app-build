@@ -760,7 +760,7 @@ export default function CreateCampaignPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background create-page">
       <UseSessionWalletReset />
       <OverlaySuppressor />
       <div className="container mx-auto px-4 pt-24 pb-8">
@@ -1166,11 +1166,12 @@ export default function CreateCampaignPage() {
 
                           <div className="space-y-2">
                             <Label htmlFor="endDate">Campaign End Date *</Label>
-                            <Popover modal={false}>
+                            <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen} modal={false}>
                               <PopoverTrigger asChild>
                                 <Button
                                   type="button"
                                   variant="outline"
+                                  onClick={() => setIsEndDateOpen((v) => !v)}
                                   className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
                                 >
                                   <CalendarIcon className="mr-2 h-4 w-4" />
@@ -1181,8 +1182,7 @@ export default function CreateCampaignPage() {
                                   )}
                                 </Button>
                               </PopoverTrigger>
-                              {/* CHANGE: Increase z-index to 9999 to ensure calendar is always on top */}
-                              <PopoverContent className="w-auto p-0 z-[9999]" align="start" forceMount>
+                              <PopoverContent className="w-auto p-0 z-[60]" align="start" forceMount>
                                 <Calendar
                                   mode="single"
                                   selected={campaignData.funding.endDate}
@@ -1192,6 +1192,7 @@ export default function CreateCampaignPage() {
                                       funding: { ...prev.funding, endDate: date },
                                     }))
                                     if (date) {
+                                      setIsEndDateOpen(false)
                                       setErrors((prev) => {
                                         const { endDate, ...rest } = prev
                                         return rest
