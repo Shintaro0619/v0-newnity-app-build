@@ -843,7 +843,7 @@ export default function CreateCampaignPage() {
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
+                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20 relative z-[60]">
                   <TabsTrigger
                     value="basic"
                     className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"

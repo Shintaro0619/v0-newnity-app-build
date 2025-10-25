@@ -49,7 +49,7 @@ export default function InlineCalendar({ value, onChange, placeholder = "Pick a 
       {mounted && open && (
         <div
           data-inline-calendar
-          className="absolute z-[2147483647] mt-2 rounded-md border bg-background shadow w-[280px]"
+          className="absolute left-0 top-full mt-2 z-50 w-[280px] rounded-md border bg-background shadow pointer-events-auto"
         >
           <Calendar
             mode="single"
