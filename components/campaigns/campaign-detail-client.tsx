@@ -277,31 +277,29 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
       console.log("[v0] [CLIENT] Calling syncCampaignFromChain with campaignId:", blockchainId)
 
       const { syncCampaignFromChain } = await import("@/lib/actions/sync-campaign")
-      const syncResult = await syncCampaignFromChain(blockchainId)
-
-      console.log("[v0] [CLIENT] Sync result:", syncResult)
+      let syncResult = await syncCampaignFromChain(blockchainId)
+      console.log("[v0] [CLIENT] Initial sync result:", syncResult)
 
       for (let attempt = 1; attempt <= 20; attempt++) {
-        console.log(`[v0] [CLIENT] Polling attempt ${attempt}/20`)
-
         if (syncResult.finalized) {
           console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
           break
         }
 
-        if (attempt < 20) {
-          console.log("[v0] [CLIENT] Not finalized yet, waiting 3s before next poll...")
-          await new Promise((resolve) => setTimeout(resolve, 3000))
+        console.log(`[v0] [CLIENT] Not finalized yet, polling attempt ${attempt}/20, waiting 3s...`)
+        await new Promise((resolve) => setTimeout(resolve, 3000))
 
-          const pollResult = await syncCampaignFromChain(blockchainId)
-          console.log(`[v0] [CLIENT] Poll result (attempt ${attempt}):`, pollResult)
+        syncResult = await syncCampaignFromChain(blockchainId)
+        console.log(`[v0] [CLIENT] Poll result (attempt ${attempt}):`, syncResult)
 
-          if (pollResult.finalized) {
-            console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
-            Object.assign(syncResult, pollResult)
-            break
-          }
+        if (syncResult.finalized) {
+          console.log("[v0] [CLIENT] Blockchain state confirmed as finalized!")
+          break
         }
+      }
+
+      if (!syncResult.finalized) {
+        console.warn("[v0] [CLIENT] Blockchain state not finalized after 20 polls, but continuing...")
       }
 
       syncAttempted.current = false
@@ -639,7 +637,7 @@ export function CampaignDetailClient({ campaign: initialCampaign }: CampaignDeta
                         className="flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-lg transition-colors"
                       >
                         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.059-1.684.07-4.85.07-3.204 0-3.584-.012-4.849-.07 0 3.205.012 3.584.07 4.849.149 3.225 1.664 4.771 4.919 4.919 1.266.059 1.684-.07 4.85-.07 2.209 0 4 1.79 4 4s-1.791 4-4 4zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
+                          <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.07 4.849.149 3.225 1.664 4.771 4.919 4.919 1.266.059 1.684-.07 4.85-.07 2.209 0 4 1.79 4 4s-1.791 4-4 4zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" />
                         </svg>
                         <span className="text-sm font-medium">Instagram</span>
                       </a>
