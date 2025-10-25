@@ -13,11 +13,9 @@ import { RichEditor } from "@/components/ui/rich-editor"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert"
 import { MediaUpload } from "@/components/ui/media-upload"
-import { Save, ArrowLeft, Trash2, ImageIcon, Target, Users, CalendarIcon } from "lucide-react"
-import { format } from "date-fns"
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-import { Calendar } from "@/components/ui/calendar"
+import { Save, ArrowLeft, Trash2, ImageIcon, Target, Users } from "lucide-react"
 import { cn } from "@/lib/utils" // Fixed import: cn should be imported from @/lib/utils
+import InlineCalendar from "@/components/forms/InlineCalendar"
 
 interface RewardTier {
   id: string
@@ -90,6 +88,7 @@ export default function EditCampaignPage() {
   const [coverImage, setCoverImage] = useState<File | null>(null)
   const [galleryFiles, setGalleryFiles] = useState<(File | string)[]>([])
   const [isEndDateOpen, setIsEndDateOpen] = useState(false)
+  const [showEndCalendar, setShowEndCalendar] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => setMounted(true), [])
@@ -388,6 +387,7 @@ export default function EditCampaignPage() {
     onDelete: () => void
   }) => {
     const [isDeliveryDateOpen, setIsDeliveryDateOpen] = useState(false)
+    const [showDeliveryCalendar, setShowDeliveryCalendar] = useState(false)
     const [localQuantity, setLocalQuantity] = useState<string>(tier.quantity?.toString() ?? "")
 
     const handleQuantityBlur = () => {
@@ -444,28 +444,10 @@ export default function EditCampaignPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Estimated Delivery</Label>
-              <Popover open={isDeliveryDateOpen} onOpenChange={setIsDeliveryDateOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {tier.deliveryDate ? format(tier.deliveryDate, "PPP") : "Pick a date"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={tier.deliveryDate}
-                    onSelect={(date) => {
-                      onUpdate({ ...tier, deliveryDate: date })
-                      if (date) setIsDeliveryDateOpen(false)
-                    }}
-                    disabled={(date) => date < new Date()}
-                  />
-                </PopoverContent>
-              </Popover>
+              <InlineCalendar
+                value={tier.deliveryDate}
+                onChange={(date) => onUpdate({ ...tier, deliveryDate: date })}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-base font-semibold">Limited Quantity</Label>
@@ -566,7 +548,7 @@ export default function EditCampaignPage() {
           <div className="space-y-6">
             {mounted ? (
               <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20">
+                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20 relative z-[60]">
                   <TabsTrigger value="basic">Basic Info</TabsTrigger>
                   <TabsTrigger value="media">Media</TabsTrigger>
                   <TabsTrigger value="funding">Funding</TabsTrigger>
@@ -800,38 +782,18 @@ export default function EditCampaignPage() {
 
                         <div className="space-y-2">
                           <Label htmlFor="endDate">Campaign End Date *</Label>
-                          <Popover open={isEndDateOpen} onOpenChange={setIsEndDateOpen}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
-                              >
-                                <CalendarIcon className="mr-2 h-4 w-4" />
-                                {campaignData?.funding.endDate ? (
-                                  format(campaignData.funding.endDate, "PPP")
-                                ) : (
-                                  <span className="text-muted-foreground">Pick an end date</span>
-                                )}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={campaignData?.funding.endDate}
-                                onSelect={(date) => {
-                                  setCampaignData((prev) => {
-                                    if (!prev) return prev
-                                    return {
-                                      ...prev,
-                                      funding: { ...prev.funding, endDate: date },
-                                    }
-                                  })
-                                  if (date) setIsEndDateOpen(false)
-                                }}
-                                disabled={(date) => date < new Date()}
-                              />
-                            </PopoverContent>
-                          </Popover>
+                          <InlineCalendar
+                            value={campaignData?.funding.endDate}
+                            onChange={(date) => {
+                              setCampaignData((prev) => {
+                                if (!prev) return prev
+                                return {
+                                  ...prev,
+                                  funding: { ...prev.funding, endDate: date },
+                                }
+                              })
+                            }}
+                          />
                         </div>
                       </div>
                     </CardContent>
