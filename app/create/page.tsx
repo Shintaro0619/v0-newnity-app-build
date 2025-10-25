@@ -30,6 +30,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { UseSessionWalletReset } from "@/components/use-session-wallet-reset" // Added UseSessionWalletReset
 import InlineCalendar from "@/components/forms/InlineCalendar" // Import InlineCalendar
+import { OverlaySuppressor } from "@/components/overlay-suppressor"
 
 const WalletConnectButton = dynamic(() => import("@/components/wallet-connect-button"), {
   ssr: false,
@@ -761,6 +762,7 @@ export default function CreateCampaignPage() {
   return (
     <div className="min-h-screen bg-background">
       <UseSessionWalletReset />
+      <OverlaySuppressor />
       <div className="container mx-auto px-4 pt-24 pb-8">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Header */}
@@ -1179,7 +1181,8 @@ export default function CreateCampaignPage() {
                                   )}
                                 </Button>
                               </PopoverTrigger>
-                              <PopoverContent className="w-auto p-0 z-[1000]" align="start" forceMount>
+                              {/* CHANGE: Increase z-index to 9999 to ensure calendar is always on top */}
+                              <PopoverContent className="w-auto p-0 z-[9999]" align="start" forceMount>
                                 <Calendar
                                   mode="single"
                                   selected={campaignData.funding.endDate}
