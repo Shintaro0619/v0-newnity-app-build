@@ -213,6 +213,9 @@ export default function CreateCampaignPage() {
     mode: "onChange",
   })
 
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => setMounted(true), [])
+
   useEffect(() => {
     const isTyping = (el: EventTarget | null) => {
       if (!el) return false
@@ -842,437 +845,474 @@ export default function CreateCampaignPage() {
           {/* Main Content */}
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             <div className="lg:col-span-3">
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20 relative z-[60]">
-                  <TabsTrigger
-                    value="basic"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
-                  >
-                    Basic Info
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="media"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
-                  >
-                    Media
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="funding"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
-                  >
-                    Funding
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="tiers"
-                    className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
-                  >
-                    Reward Tiers
-                  </TabsTrigger>
-                </TabsList>
+              {mounted ? (
+                <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-4 bg-muted/50 border border-primary/20 relative z-[60]">
+                    <TabsTrigger
+                      value="basic"
+                      className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                    >
+                      Basic Info
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="media"
+                      className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                    >
+                      Media
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="funding"
+                      className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                    >
+                      Funding
+                    </TabsTrigger>
+                    <TabsTrigger
+                      value="tiers"
+                      className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary data-[state=active]:border data-[state=active]:border-primary/40"
+                    >
+                      Reward Tiers
+                    </TabsTrigger>
+                  </TabsList>
 
-                <TabsContent value="basic" forceMount className="space-y-6">
-                  <Card className="border-2 border-primary/20">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <span className="text-2xl">📄</span>
-                        Campaign Details
-                      </CardTitle>
-                      <CardDescription>Tell us about your project</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Campaign Title *</Label>
-                        <Input
-                          id="title"
-                          value={campaignData.basic.title}
-                          onChange={(e) =>
-                            setCampaignData((prev) => ({
-                              ...prev,
-                              basic: { ...prev.basic, title: e.target.value },
-                            }))
-                          }
-                          placeholder="Revolutionary VR Headset for Everyone"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                        {errors.title && <p className="text-sm font-semibold text-destructive">{errors.title}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="subtitle">Subtitle *</Label>
-                        <Input
-                          id="subtitle"
-                          value={campaignData.basic.subtitle}
-                          onChange={(e) =>
-                            setCampaignData((prev) => ({
-                              ...prev,
-                              basic: { ...prev.basic, subtitle: e.target.value },
-                            }))
-                          }
-                          placeholder="Immersive virtual reality at an affordable price"
-                          className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                        />
-                        {errors.subtitle && <p className="text-sm font-semibold text-destructive">{errors.subtitle}</p>}
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="description">Campaign Description *</Label>
-                        <RichEditor
-                          content={campaignData.basic.description}
-                          onChange={(content) =>
-                            setCampaignData((prev) => ({
-                              ...prev,
-                              basic: { ...prev.basic, description: content },
-                            }))
-                          }
-                          placeholder="Tell your story. What makes your project special? What problem does it solve? Use rich formatting to make your description engaging and professional."
-                          className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
-                        />
-                        {errors.description && (
-                          <p className="text-sm font-semibold text-destructive">{errors.description}</p>
-                        )}
-                      </div>
-
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <TabsContent value="basic" forceMount className="space-y-6">
+                    <Card className="border-2 border-primary/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <span className="text-2xl">📄</span>
+                          Campaign Details
+                        </CardTitle>
+                        <CardDescription>Tell us about your project</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
                         <div className="space-y-2">
-                          <Label htmlFor="category">Category *</Label>
-                          <Select
-                            value={campaignData.basic.category}
-                            onValueChange={(value) =>
+                          <Label htmlFor="title">Campaign Title *</Label>
+                          <Input
+                            id="title"
+                            value={campaignData.basic.title}
+                            onChange={(e) =>
                               setCampaignData((prev) => ({
                                 ...prev,
-                                basic: { ...prev.basic, category: value },
+                                basic: { ...prev.basic, title: e.target.value },
                               }))
                             }
-                          >
-                            <SelectTrigger className="border-2 border-border bg-zinc-800">
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {categories.map((category) => (
-                                <SelectItem key={category} value={category.toLowerCase()}>
-                                  {category}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          {errors.category && (
-                            <p className="text-sm font-semibold text-destructive">{errors.category}</p>
+                            placeholder="Revolutionary VR Headset for Everyone"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                          {errors.title && <p className="text-sm font-semibold text-destructive">{errors.title}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="subtitle">Subtitle *</Label>
+                          <Input
+                            id="subtitle"
+                            value={campaignData.basic.subtitle}
+                            onChange={(e) =>
+                              setCampaignData((prev) => ({
+                                ...prev,
+                                basic: { ...prev.basic, subtitle: e.target.value },
+                              }))
+                            }
+                            placeholder="Immersive virtual reality at an affordable price"
+                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                          />
+                          {errors.subtitle && (
+                            <p className="text-sm font-semibold text-destructive">{errors.subtitle}</p>
                           )}
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="tags">Tags (comma separated)</Label>
-                          <Input
-                            id="tags"
-                            value={campaignData.basic.tags.join(", ")}
-                            onChange={(e) => {
-                              const value = e.target.value
+                          <Label htmlFor="description">Campaign Description *</Label>
+                          <RichEditor
+                            content={campaignData.basic.description}
+                            onChange={(content) =>
                               setCampaignData((prev) => ({
                                 ...prev,
-                                basic: {
-                                  ...prev.basic,
-                                  tags: value ? [value] : [],
-                                },
-                              }))
-                            }}
-                            onBlur={(e) => {
-                              const value = e.target.value
-                              const tags = value
-                                .split(",")
-                                .map((tag) => tag.trim())
-                                .filter(Boolean)
-                              setCampaignData((prev) => ({
-                                ...prev,
-                                basic: { ...prev.basic, tags },
-                              }))
-                            }}
-                            placeholder="VR, Gaming, Technology"
-                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Separate tags with commas (e.g., VR, Gaming, Technology)
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="media" forceMount className="space-y-6">
-                  <Card className="border-2 border-primary/20">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <ImageIcon className="h-5 w-5" />
-                        Campaign Media
-                      </CardTitle>
-                      <CardDescription>Upload images and add video to showcase your campaign</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-8">
-                      <Alert>
-                        <div className="flex items-center gap-3 col-span-2">
-                          <span className="text-lg flex-shrink-0">ℹ️</span>
-                          <p className="text-sm flex-1">
-                            High-quality images and videos significantly increase campaign success rates. Make sure your
-                            media clearly shows your product or project.
-                          </p>
-                        </div>
-                      </Alert>
-
-                      <MediaUpload
-                        type="image"
-                        title="Main Campaign Image *"
-                        description="This will be the primary image shown on your campaign page"
-                        maxSize={10 * 1024 * 1024}
-                        enableCompression={true}
-                        showPreview={true}
-                        initialFiles={campaignData.media.mainImageUrl ? [campaignData.media.mainImageUrl] : []} // Pass initialFiles
-                        onFilesChange={handleMainImageChange}
-                        onError={handleMediaError}
-                      />
-                      {errors.mainImage && !campaignData.media.mainImage && !campaignData.media.mainImageUrl && (
-                        <p className="text-sm font-semibold text-destructive">{errors.mainImage}</p>
-                      )}
-
-                      <Separator />
-
-                      <MediaUpload
-                        type="image"
-                        title="Gallery Images"
-                        description="Additional images to showcase your project (optional)"
-                        multiple={true}
-                        maxFiles={8}
-                        maxSize={10 * 1024 * 1024}
-                        enableCompression={true}
-                        showPreview={true}
-                        initialFiles={campaignData.media.galleryUrls} // Pass initialFiles
-                        onFilesChange={handleGalleryChange}
-                        onError={handleMediaError}
-                      />
-
-                      <Separator />
-
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="youtubeUrl" className="text-base font-semibold">
-                            Campaign Video (YouTube)
-                          </Label>
-                          <p className="text-sm text-muted-foreground">
-                            Add a YouTube video to showcase your campaign. Videos can significantly boost engagement!
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="youtubeUrl">YouTube URL</Label>
-                          <Input
-                            id="youtubeUrl"
-                            type="url"
-                            value={campaignData.media.youtubeUrl}
-                            onChange={(e) =>
-                              setCampaignData((prev) => ({
-                                ...prev,
-                                media: { ...prev.media, youtubeUrl: e.target.value },
+                                basic: { ...prev.basic, description: content },
                               }))
                             }
-                            placeholder="https://www.youtube.com/watch?v=..."
-                            className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            placeholder="Tell your story. What makes your project special? What problem does it solve? Use rich formatting to make your description engaging and professional."
+                            className="border-2 border-border bg-zinc-800 focus-within:border-primary focus-within:bg-background"
                           />
-                          <p className="text-xs text-muted-foreground">
-                            Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/embed/
-                            links.
-                          </p>
+                          {errors.description && (
+                            <p className="text-sm font-semibold text-destructive">{errors.description}</p>
+                          )}
                         </div>
 
-                        {campaignData.media.youtubeUrl && (
-                          <div className="aspect-video bg-muted rounded-lg overflow-hidden">
-                            <iframe
-                              src={(() => {
-                                const url = campaignData.media.youtubeUrl
-                                const patterns = [
-                                  /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
-                                  /youtube\.com\/shorts\/([^&\n?#]+)/,
-                                ]
-                                for (const pattern of patterns) {
-                                  const match = url.match(pattern)
-                                  if (match && match[1]) {
-                                    return `https://www.youtube.com/embed/${match[1]}`
-                                  }
-                                }
-                                return ""
-                              })()}
-                              title="Campaign video preview"
-                              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                              allowFullScreen
-                              className="w-full h-full"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="funding" forceMount className="space-y-6">
-                  <Card className="border-2 border-primary/20">
-                    <CardHeader>
-                      <CardTitle className="flex items-center gap-2">
-                        <Target className="h-5 w-5" />
-                        Funding Goals
-                      </CardTitle>
-                      <CardDescription>Set your funding target and timeline</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="goal">Funding Goal (USDC) *</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id="goal"
-                              type="number"
-                              inputMode="numeric"
-                              min={1}
-                              step={1}
-                              value={campaignData.funding.goal || ""}
-                              onChange={(e) => {
-                                const value = e.target.value === "" ? 0 : Number(e.target.value)
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="category">Category *</Label>
+                            <Select
+                              value={campaignData.basic.category}
+                              onValueChange={(value) =>
                                 setCampaignData((prev) => ({
                                   ...prev,
-                                  funding: { ...prev.funding, goal: value },
+                                  basic: { ...prev.basic, category: value },
                                 }))
-                                if (value > 0) {
-                                  setErrors((prev) => {
-                                    const { goal, ...rest } = prev
-                                    return rest
-                                  })
-                                }
-                              }}
-                              placeholder="50000"
-                              className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
-                            />
+                              }
+                            >
+                              <SelectTrigger className="border-2 border-border bg-zinc-800">
+                                <SelectValue placeholder="Select a category" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {categories.map((category) => (
+                                  <SelectItem key={category} value={category.toLowerCase()}>
+                                    {category}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            {errors.category && (
+                              <p className="text-sm font-semibold text-destructive">{errors.category}</p>
+                            )}
                           </div>
-                          {errors.goal && <p className="text-sm font-semibold text-destructive">{errors.goal}</p>}
-                          <p className="text-xs text-muted-foreground">
-                            Set a realistic goal based on your project needs
-                          </p>
-                        </div>
 
-                        <div className="space-y-2">
-                          <Label htmlFor="endDate">Campaign End Date *</Label>
-                          <InlineCalendar
-                            value={campaignData.funding.endDate}
-                            onChange={(date) => {
-                              setCampaignData((prev) => ({ ...prev, funding: { ...prev.funding, endDate: date } }))
-                              if (date) setErrors(({ endDate, ...rest }) => rest)
-                            }}
-                            minDate={new Date()}
-                          />
-                          {errors.endDate && <p className="text-sm font-semibold text-destructive">{errors.endDate}</p>}
-                          <p className="text-xs text-muted-foreground">
-                            Campaign will end at 23:59:59 UTC on the selected day. Most successful campaigns run for
-                            30-60 days.
-                          </p>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="minPledge">Minimum Pledge (USDC)</Label>
-                          <div className="relative">
-                            <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <div className="space-y-2">
+                            <Label htmlFor="tags">Tags (comma separated)</Label>
                             <Input
-                              id="minPledge"
-                              type="number"
-                              inputMode="numeric"
-                              min={1}
-                              step={1}
-                              value={campaignData.funding.minPledge || ""}
+                              id="tags"
+                              value={campaignData.basic.tags.join(", ")}
                               onChange={(e) => {
-                                const value = e.target.value === "" ? 0 : Number(e.target.value)
+                                const value = e.target.value
                                 setCampaignData((prev) => ({
                                   ...prev,
-                                  funding: { ...prev.funding, minPledge: value },
+                                  basic: {
+                                    ...prev.basic,
+                                    tags: value ? [value] : [],
+                                  },
                                 }))
                               }}
-                              placeholder="1"
-                              className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                              onBlur={(e) => {
+                                const value = e.target.value
+                                const tags = value
+                                  .split(",")
+                                  .map((tag) => tag.trim())
+                                  .filter(Boolean)
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  basic: { ...prev.basic, tags },
+                                }))
+                              }}
+                              placeholder="VR, Gaming, Technology"
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
                             />
+                            <p className="text-xs text-muted-foreground">
+                              Separate tags with commas (e.g., VR, Gaming, Technology)
+                            </p>
                           </div>
-                          <p className="text-xs text-muted-foreground">Minimum amount backers can pledge</p>
                         </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
 
-                        {/* Currency selection removed - USDC only */}
-                      </div>
-
-                      <Alert>
-                        <div className="flex items-center gap-3 col-span-2">
-                          <span className="text-lg flex-shrink-0">⚠️</span>
-                          <p className="text-sm flex-1">
-                            Remember: This is an all-or-nothing funding model. You only receive funds if you reach your
-                            goal by the deadline.
-                          </p>
-                        </div>
-                      </Alert>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-
-                <TabsContent value="tiers" forceMount className="space-y-6">
-                  <Card className="border-2 border-primary/20">
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="flex items-center gap-2">
-                            <Users className="h-5 w-5" />
-                            Reward Tiers
-                          </CardTitle>
-                          <CardDescription>Create reward tiers for your backers</CardDescription>
-                        </div>
-                        <Button onClick={addRewardTier} type="button" className="bg-primary hover:bg-primary/90">
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Tier
-                        </Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-6">
-                      {errors.rewards && (
-                        <Alert className="border-2 border-destructive bg-destructive/10">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl flex-shrink-0">⚠️</span>
-                            <p className="text-sm font-semibold text-destructive">{errors.rewards}</p>
+                  <TabsContent value="media" forceMount className="space-y-6">
+                    <Card className="border-2 border-primary/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <ImageIcon className="h-5 w-5" />
+                          Campaign Media
+                        </CardTitle>
+                        <CardDescription>Upload images and add video to showcase your campaign</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-8">
+                        <Alert>
+                          <div className="flex items-center gap-3 col-span-2">
+                            <span className="text-lg flex-shrink-0">ℹ️</span>
+                            <p className="text-sm flex-1">
+                              High-quality images and videos significantly increase campaign success rates. Make sure
+                              your media clearly shows your product or project.
+                            </p>
                           </div>
                         </Alert>
-                      )}
 
-                      <div ref={tiersContainerRef} className="tiers-editor space-y-6">
-                        {campaignData.rewards.map((tier, index) => (
-                          <div key={tier.id} ref={setTierRef(tier.id)}>
-                            <div className="mb-2 text-sm text-muted-foreground">Reward Tier {index + 1}</div>
-                            <RewardTierCard
-                              tier={tier}
-                              onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
-                              onDelete={() => deleteRewardTier(index)}
-                            />
-                          </div>
-                        ))}
-
-                        {campaignData.rewards.length === 0 && (
-                          <Card className="border-dashed border-2">
-                            <CardContent className="pt-6 text-center">
-                              <span className="text-6xl mb-4 block">🎁</span>
-                              <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
-                              <p className="text-muted-foreground mb-4">
-                                Create reward tiers to incentivize backers and offer value for their support.
-                              </p>
-                              <Button onClick={addRewardTier} type="button" className="bg-primary hover:bg-primary/90">
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create Your First Tier
-                              </Button>
-                            </CardContent>
-                          </Card>
+                        <MediaUpload
+                          type="image"
+                          title="Main Campaign Image *"
+                          description="This will be the primary image shown on your campaign page"
+                          maxSize={10 * 1024 * 1024}
+                          enableCompression={true}
+                          showPreview={true}
+                          initialFiles={campaignData.media.mainImageUrl ? [campaignData.media.mainImageUrl] : []} // Pass initialFiles
+                          onFilesChange={handleMainImageChange}
+                          onError={handleMediaError}
+                        />
+                        {errors.mainImage && !campaignData.media.mainImage && !campaignData.media.mainImageUrl && (
+                          <p className="text-sm font-semibold text-destructive">{errors.mainImage}</p>
                         )}
-                      </div>
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-              </Tabs>
+
+                        <Separator />
+
+                        <MediaUpload
+                          type="image"
+                          title="Gallery Images"
+                          description="Additional images to showcase your project (optional)"
+                          multiple={true}
+                          maxFiles={8}
+                          maxSize={10 * 1024 * 1024}
+                          enableCompression={true}
+                          showPreview={true}
+                          initialFiles={campaignData.media.galleryUrls} // Pass initialFiles
+                          onFilesChange={handleGalleryChange}
+                          onError={handleMediaError}
+                        />
+
+                        <Separator />
+
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="youtubeUrl" className="text-base font-semibold">
+                              Campaign Video (YouTube)
+                            </Label>
+                            <p className="text-sm text-muted-foreground">
+                              Add a YouTube video to showcase your campaign. Videos can significantly boost engagement!
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="youtubeUrl">YouTube URL</Label>
+                            <Input
+                              id="youtubeUrl"
+                              type="url"
+                              value={campaignData.media.youtubeUrl}
+                              onChange={(e) =>
+                                setCampaignData((prev) => ({
+                                  ...prev,
+                                  media: { ...prev.media, youtubeUrl: e.target.value },
+                                }))
+                              }
+                              placeholder="https://www.youtube.com/watch?v=..."
+                              className="border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Paste your YouTube video URL. Supports youtube.com/watch, youtu.be, and youtube.com/embed/
+                              links.
+                            </p>
+                          </div>
+
+                          {campaignData.media.youtubeUrl && (
+                            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+                              <iframe
+                                src={(() => {
+                                  const url = campaignData.media.youtubeUrl
+                                  const patterns = [
+                                    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+                                    /youtube\.com\/shorts\/([^&\n?#]+)/,
+                                  ]
+                                  for (const pattern of patterns) {
+                                    const match = url.match(pattern)
+                                    if (match && match[1]) {
+                                      return `https://www.youtube.com/embed/${match[1]}`
+                                    }
+                                  }
+                                  return ""
+                                })()}
+                                title="Campaign video preview"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                allowFullScreen
+                                className="w-full h-full"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="funding" forceMount className="space-y-6">
+                    <Card className="border-2 border-primary/20">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <Target className="h-5 w-5" />
+                          Funding Goals
+                        </CardTitle>
+                        <CardDescription>Set your funding target and timeline</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          <div className="space-y-2">
+                            <Label htmlFor="goal">Funding Goal (USDC) *</Label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="goal"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                step={1}
+                                value={campaignData.funding.goal || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value === "" ? 0 : Number(e.target.value)
+                                  setCampaignData((prev) => ({
+                                    ...prev,
+                                    funding: { ...prev.funding, goal: value },
+                                  }))
+                                  if (value > 0) {
+                                    setErrors((prev) => {
+                                      const { goal, ...rest } = prev
+                                      return rest
+                                    })
+                                  }
+                                }}
+                                placeholder="50000"
+                                className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                              />
+                            </div>
+                            {errors.goal && <p className="text-sm font-semibold text-destructive">{errors.goal}</p>}
+                            <p className="text-xs text-muted-foreground">
+                              Set a realistic goal based on your project needs
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="endDate">Campaign End Date *</Label>
+                            <Popover modal={false}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal border-2 bg-zinc-800 hover:bg-background"
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {campaignData.funding.endDate ? (
+                                    format(campaignData.funding.endDate, "PPP")
+                                  ) : (
+                                    <span className="text-muted-foreground">Pick an end date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0 z-[1000]" align="start" forceMount>
+                                <Calendar
+                                  mode="single"
+                                  selected={campaignData.funding.endDate}
+                                  onSelect={(date) => {
+                                    setCampaignData((prev) => ({
+                                      ...prev,
+                                      funding: { ...prev.funding, endDate: date },
+                                    }))
+                                    if (date) {
+                                      setErrors((prev) => {
+                                        const { endDate, ...rest } = prev
+                                        return rest
+                                      })
+                                    }
+                                  }}
+                                  disabled={(date) => date < new Date()}
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            {errors.endDate && (
+                              <p className="text-sm font-semibold text-destructive">{errors.endDate}</p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              Campaign will end at 23:59:59 UTC on the selected day. Most successful campaigns run for
+                              30-60 days.
+                            </p>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="minPledge">Minimum Pledge (USDC)</Label>
+                            <div className="relative">
+                              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="minPledge"
+                                type="number"
+                                inputMode="numeric"
+                                min={1}
+                                step={1}
+                                value={campaignData.funding.minPledge || ""}
+                                onChange={(e) => {
+                                  const value = e.target.value === "" ? 0 : Number(e.target.value)
+                                  setCampaignData((prev) => ({
+                                    ...prev,
+                                    funding: { ...prev.funding, minPledge: value },
+                                  }))
+                                }}
+                                placeholder="1"
+                                className="pl-10 border-2 border-border bg-zinc-800 focus:border-primary focus:bg-background"
+                              />
+                            </div>
+                            <p className="text-xs text-muted-foreground">Minimum amount backers can pledge</p>
+                          </div>
+
+                          {/* Currency selection removed - USDC only */}
+                        </div>
+
+                        <Alert>
+                          <div className="flex items-center gap-3 col-span-2">
+                            <span className="text-lg flex-shrink-0">⚠️</span>
+                            <p className="text-sm flex-1">
+                              Remember: This is an all-or-nothing funding model. You only receive funds if you reach
+                              your goal by the deadline.
+                            </p>
+                          </div>
+                        </Alert>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
+                  <TabsContent value="tiers" forceMount className="space-y-6">
+                    <Card className="border-2 border-primary/20">
+                      <CardHeader>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <CardTitle className="flex items-center gap-2">
+                              <Users className="h-5 w-5" />
+                              Reward Tiers
+                            </CardTitle>
+                            <CardDescription>Create reward tiers for your backers</CardDescription>
+                          </div>
+                          <Button onClick={addRewardTier} type="button" className="bg-primary hover:bg-primary/90">
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add Tier
+                          </Button>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-6">
+                        {errors.rewards && (
+                          <Alert className="border-2 border-destructive bg-destructive/10">
+                            <div className="flex items-center gap-3">
+                              <span className="text-2xl flex-shrink-0">⚠️</span>
+                              <p className="text-sm font-semibold text-destructive">{errors.rewards}</p>
+                            </div>
+                          </Alert>
+                        )}
+
+                        <div ref={tiersContainerRef} className="tiers-editor space-y-6">
+                          {campaignData.rewards.map((tier, index) => (
+                            <div key={tier.id} ref={setTierRef(tier.id)}>
+                              <div className="mb-2 text-sm text-muted-foreground">Reward Tier {index + 1}</div>
+                              <RewardTierCard
+                                tier={tier}
+                                onUpdate={(updatedTier) => updateRewardTier(index, updatedTier)}
+                                onDelete={() => deleteRewardTier(index)}
+                              />
+                            </div>
+                          ))}
+
+                          {campaignData.rewards.length === 0 && (
+                            <Card className="border-dashed border-2">
+                              <CardContent className="pt-6 text-center">
+                                <span className="text-6xl mb-4 block">🎁</span>
+                                <h3 className="text-lg font-semibold mb-2">No reward tiers yet</h3>
+                                <p className="text-muted-foreground mb-4">
+                                  Create reward tiers to incentivize backers and offer value for their support.
+                                </p>
+                                <Button
+                                  onClick={addRewardTier}
+                                  type="button"
+                                  className="bg-primary hover:bg-primary/90"
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Create Your First Tier
+                                </Button>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                </Tabs>
+              ) : null}
 
               {/* Action Buttons */}
               <div className="flex justify-between pt-6">
