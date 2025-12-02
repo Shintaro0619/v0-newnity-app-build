@@ -1,42 +1,43 @@
-// middleware.ts
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const ADMIN_COOKIE_NAME = 'newnity_admin';
+const ADMIN_COOKIE_NAME = "newnity_admin"
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl;
+  const { pathname } = req.nextUrl
 
-  // 管理者クッキー
-  const adminCookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
-  const isAdmin = adminCookie && adminCookie === process.env.ADMIN_KEY;
+  const adminCookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value
+  const adminKey = process.env.ADMIN_KEY
+  const isAdmin = Boolean(adminKey && adminCookie && adminCookie === adminKey)
 
-  // Aboutとトップページは誰でもOK
-  if (pathname === '/' || pathname === '/about') {
-    return NextResponse.next();
+  // ルートと /about は誰でも見られる
+  if (pathname === "/" || pathname === "/about") {
+    return NextResponse.next()
   }
 
-  // Next.jsの静的ファイル系は誰でもOK
+  // Next.js の内部パスや静的ファイル、favicon、画像、API はそのまま通す
   if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/favicon') ||
-    pathname.startsWith('/images')
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/favicon") ||
+    pathname.startsWith("/images") ||
+    pathname.startsWith("/api")
   ) {
-    return NextResponse.next();
+    return NextResponse.next()
   }
 
-  // 管理者（＝自分）は全部見てOK
+  // 管理者だけ他のページを見られる
   if (isAdmin) {
-    return NextResponse.next();
+    return NextResponse.next()
   }
 
-  // それ以外の人は全部 /about に飛ばす
-  const url = req.nextUrl.clone();
-  url.pathname = '/about';
-  url.search = '';
-  return NextResponse.redirect(url);
+  // それ以外のユーザーはすべて /about にリダイレクト
+  const url = req.nextUrl.clone()
+  url.pathname = "/about"
+  url.search = ""
+  return NextResponse.redirect(url)
 }
 
+// すべての通常ルートに middleware を適用（静的ファイルなどは除外）
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
-};
+  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+}

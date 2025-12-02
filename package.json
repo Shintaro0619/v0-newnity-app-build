@@ -87,6 +87,7 @@
     "@wagmi/core": "latest",
     "@walletconnect/ethereum-provider": "latest",
     "autoprefixer": "^10.4.20",
+    "better-sqlite3": "latest",
     "big-integer": "1.6.52",
     "chai": "latest",
     "class-variance-authority": "^0.7.1",
