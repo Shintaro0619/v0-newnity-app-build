@@ -29,6 +29,7 @@
     "@nomicfoundation/hardhat-network-helpers": "latest",
     "@nomicfoundation/hardhat-toolbox": "latest",
     "@nomicfoundation/hardhat-verify": "latest",
+    "@prisma/adapter-pg": "latest",
     "@prisma/client": "latest",
     "@radix-ui/react-accordion": "1.2.2",
     "@radix-ui/react-alert-dialog": "1.1.4",
@@ -107,6 +108,7 @@
     "next-themes": "latest",
     "node-fetch": "latest",
     "permissionless": "^0.1.44",
+    "pg": "^8.13.0",
     "porto": "latest",
     "prisma": "latest",
     "react": "^18",
@@ -140,5 +142,8 @@
     "tailwindcss": "^4.1.9",
     "tw-animate-css": "1.3.3",
     "typescript": "^5"
-  }
+  },
+  "trustedDependencies": [
+    "pg-native"
+  ]
 }
