@@ -1,43 +1,44 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+// middleware.ts
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
-const ADMIN_COOKIE_NAME = "newnity_admin"
+const ADMIN_COOKIE_NAME = "newnity_admin";
 
 export function middleware(req: NextRequest) {
-  const { pathname } = req.nextUrl
+  const { pathname } = req.nextUrl;
 
-  const adminCookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value
-  const adminKey = process.env.ADMIN_KEY
-  const isAdmin = Boolean(adminKey && adminCookie && adminCookie === adminKey)
+  const adminCookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
+  const adminKey = process.env.ADMIN_KEY;
+  const isAdmin = Boolean(adminKey && adminCookie && adminCookie === adminKey);
 
-  // ルートと /about は誰でも見られる
-  if (pathname === "/" || pathname === "/about") {
-    return NextResponse.next()
-  }
-
-  // Next.js の内部パスや静的ファイル、favicon、画像、API はそのまま通す
+  // Next.js の内部ファイルや API は常に通す
   if (
     pathname.startsWith("/_next") ||
     pathname.startsWith("/favicon") ||
     pathname.startsWith("/images") ||
     pathname.startsWith("/api")
   ) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  // 管理者だけ他のページを見られる
+  // 管理者はすべてのページOK
   if (isAdmin) {
-    return NextResponse.next()
+    return NextResponse.next();
   }
 
-  // それ以外のユーザーはすべて /about にリダイレクト
-  const url = req.nextUrl.clone()
-  url.pathname = "/about"
-  url.search = ""
-  return NextResponse.redirect(url)
+  // 一般ユーザーが直接アクセスしてOKなのは /about だけ
+  if (pathname === "/about") {
+    return NextResponse.next();
+  }
+
+  // それ以外（"/" を含む全ルート）は /about にリダイレクト
+  const url = req.nextUrl.clone();
+  url.pathname = "/about";
+  url.search = "";
+  return NextResponse.redirect(url);
 }
 
-// すべての通常ルートに middleware を適用（静的ファイルなどは除外）
+// staticファイルなどを除いてすべてに適用
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
-}
+};
